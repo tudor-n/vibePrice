@@ -7,6 +7,8 @@
     <ProjectReference Include="..\..\src\PricePilot.Application\PricePilot.Application.csproj" />
     <ProjectReference Include="..\..\src\PricePilot.Infrastructure\PricePilot.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\PricePilot.Connectors\PricePilot.Connectors.csproj" />
+    <!-- For WebApplicationFactory-based endpoint tests (login/auth). -->
+    <ProjectReference Include="..\..\src\PricePilot.Api\PricePilot.Api.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.*" />
@@ -15,6 +17,7 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="9.0.*" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.*" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.*" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.*" />

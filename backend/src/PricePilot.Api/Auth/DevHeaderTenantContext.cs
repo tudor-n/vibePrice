@@ -3,19 +3,36 @@ using PricePilot.Application;
 namespace PricePilot.Api.Auth;
 
 /// <summary>
-/// TODO(auth): DEVELOPMENT-ONLY STUB — resolves the tenant from the X-Tenant-Id request
-/// header with no authentication whatsoever. This class is registered exclusively when
-/// ASPNETCORE_ENVIRONMENT=Development (see Program.cs); production uses
-/// <see cref="JwtClaimTenantContext"/> and requires a validated JWT. Replace this with a
-/// real login flow issuing tenant-scoped JWTs.
+/// DEVELOPMENT-ONLY — registered exclusively when ASPNETCORE_ENVIRONMENT=Development
+/// (see Program.cs); production uses <see cref="JwtClaimTenantContext"/> and requires a
+/// validated JWT. Resolution order:
+/// 1. tenant_id claim of a validated Bearer token (same as production) — takes precedence;
+/// 2. the unauthenticated X-Tenant-Id request header (web dev + tooling convenience).
 /// </summary>
 public sealed class DevHeaderTenantContext(IHttpContextAccessor accessor) : ITenantContext
 {
     public const string HeaderName = "X-Tenant-Id";
 
-    public Guid? TenantId =>
-        accessor.HttpContext?.Request.Headers[HeaderName] is { Count: > 0 } values
-        && Guid.TryParse(values.ToString(), out var tenantId)
-            ? tenantId
-            : null;
+    public Guid? TenantId
+    {
+        get
+        {
+            if (accessor.HttpContext is not { } http)
+            {
+                return null;
+            }
+
+            // Bearer token first: real logins behave identically in Development and production.
+            if (http.User.FindFirst(AuthConstants.TenantClaim)?.Value is { } claim
+                && Guid.TryParse(claim, out var fromClaim))
+            {
+                return fromClaim;
+            }
+
+            return http.Request.Headers[HeaderName] is { Count: > 0 } values
+                && Guid.TryParse(values.ToString(), out var fromHeader)
+                    ? fromHeader
+                    : null;
+        }
+    }
 }

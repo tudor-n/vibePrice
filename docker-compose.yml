@@ -25,6 +25,8 @@ services:
       ASPNETCORE_URLS: http://+:8080
       ConnectionStrings__Default: Host=db;Port=5432;Database=${POSTGRES_DB:-pricepilot};Username=${POSTGRES_USER:-pricepilot};Password=${POSTGRES_PASSWORD:-devpassword}
       JWT_SIGNING_KEY: ${JWT_SIGNING_KEY:-dev-only-change-me-32-chars-minimum!!}
+      Database__MigrateOnStartup: ${DATABASE_MIGRATE_ON_STARTUP:-true}
+      Demo__SeedOnStartup: ${DEMO_SEED_ON_STARTUP:-true}
     ports:
       - "8080:8080"
     depends_on:

@@ -60,22 +60,39 @@ string; never used at runtime).
 - Every `ITenantOwned` entity (User, Property, RoomType, Competitor, Recommendation,
   OwnBooking) has a **global query filter** in `AppDbContext` bound to `ITenantContext`.
   Unresolved tenant ⇒ filter matches nothing (no leak by default).
-- **Never call `IgnoreQueryFilters()`** outside dedicated admin code.
+- **Never call `IgnoreQueryFilters()`** outside dedicated admin/system code. The two
+  documented exceptions: `AuthService.LoginAsync` (login happens before a tenant is
+  resolved) and `DemoSeeder` (writes the fixed cross-tenant demo world at startup).
 - Endpoints taking an id must verify ownership; the pattern used here is "look it up
   through the filtered context and 404 when absent" (see `RecommendationQueries.UpdateStatusAsync`,
   `PropertyService.AddCompetitorAsync`).
 - New writes must set `TenantId` from `ITenantContext`, never from request bodies.
-- TODO(auth): `DevHeaderTenantContext` (X-Tenant-Id header, anonymous) is Development-only;
-  production requires `JWT_SIGNING_KEY` and resolves the tenant from the `tenant_id` JWT claim.
-  Replace with a real login flow. Production refuses to boot without auth config.
+- Real login exists: `POST /api/v1/auth/login` (anonymous, fixed-window rate limit
+  10/min per IP) verifies credentials via `IAuthService` (Infrastructure, PBKDF2 through
+  `PasswordHasher<User>`) and issues 12h HS256 JWTs signed with `JWT_SIGNING_KEY`
+  (`JwtTokenIssuer` in Api; claims `sub`, `tenant_id`, `email`, `role`).
+- `DevHeaderTenantContext` (Development only) resolves the tenant from a validated Bearer
+  token's `tenant_id` claim first, then falls back to the anonymous X-Tenant-Id header
+  (web dev + tooling still work). Production uses `JwtClaimTenantContext` exclusively and
+  refuses to boot without `JWT_SIGNING_KEY`.
 
 ## Config (12-factor — env vars only)
 
 | Variable | Purpose |
 |---|---|
 | `ConnectionStrings__Default` | Postgres connection string (required outside Development) |
-| `JWT_SIGNING_KEY` | Bearer token signing key (required outside Development) |
+| `JWT_SIGNING_KEY` | Signs login-issued tokens and validates bearer tokens (required outside Development) |
 | `Database__MigrateOnStartup` | `true` ⇒ apply migrations on boot (docker compose) |
+| `Demo__SeedOnStartup` | `true` ⇒ run `DemoSeeder` after migrations; **Development only** (refused with a warning elsewhere) |
+
+## Demo seeding
+
+`Infrastructure/DemoSeeder.cs` seeds exactly the backend-owned rows fixed in
+`shared/contracts/demo-seed.md` (tenant, demo user `demo@pricepilot.local` / `Demo1234!`
+hashed at seed time, property, 2 room types, 3 competitors — fixed UUIDs, city `sibiu`).
+Idempotent: insert-if-missing per fixed key, never updates, safe on partially seeded DBs.
+Enabled by default in `appsettings.Development.json`; override with `Demo__SeedOnStartup=false`
+for a database-free `dotnet run`.
 
 ## Schema changes
 

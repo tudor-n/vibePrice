@@ -4,15 +4,27 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { apiFetch } from './client';
+import { apiFetch, login } from './client';
 import type {
   Competitor,
   EventItem,
   Job,
   JobCreate,
+  LoginRequest,
   Property,
   Recommendation,
 } from './types';
+
+export function useLogin() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ email, password }: LoginRequest) => login(email, password),
+    onSuccess: () => {
+      // A new identity invalidates everything cached for the previous one.
+      void queryClient.invalidateQueries();
+    },
+  });
+}
 
 export function useProperties() {
   return useQuery({

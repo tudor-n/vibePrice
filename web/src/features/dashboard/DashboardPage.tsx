@@ -1,4 +1,5 @@
-import { useEvents, useProperties, useRecommendations, useTriggerJob } from '../../api/hooks';
+import { useEvents, useRecommendations, useTriggerJob } from '../../api/hooks';
+import { useSelectedProperty } from '../../app/PropertyContext';
 import { formatMoney } from '../../components/Money';
 import { EmptyState, ErrorState, LoadingState } from '../../components/States';
 
@@ -7,8 +8,8 @@ function isoDate(date: Date): string {
 }
 
 export function DashboardPage() {
-  const properties = useProperties();
-  const property = properties.data?.[0];
+  // Property comes from the app-wide selector in the header.
+  const { properties, property } = useSelectedProperty();
 
   const today = isoDate(new Date());
   const horizon = new Date();

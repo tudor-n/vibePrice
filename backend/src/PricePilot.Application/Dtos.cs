@@ -56,6 +56,17 @@ public sealed record EventDto(
     DateOnly EndDate,
     int ImpactScore);
 
+public sealed record UserInfoDto(
+    Guid Id,
+    string Email,
+    string DisplayName,
+    string Role,
+    Guid TenantId);
+
+public sealed record LoginRequestDto(string Email, string Password);
+
+public sealed record LoginResponseDto(string Token, DateTimeOffset ExpiresAt, UserInfoDto User);
+
 public sealed record JobDto(
     Guid Id,
     string Type,

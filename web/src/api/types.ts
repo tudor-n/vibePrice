@@ -9,6 +9,29 @@
 
 // --- openapi.yaml: components/schemas -------------------------------------
 
+export interface UserInfo {
+  id: string;
+  email: string;
+  displayName: string;
+  role: string;
+  tenantId: string;
+}
+
+// --- openapi.yaml: POST /auth/login ----------------------------------------
+
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface LoginResponse {
+  /** JWT (HS256); sent as `Authorization: Bearer <token>`. */
+  token: string;
+  /** ISO date-time after which the token is invalid. */
+  expiresAt: string;
+  user: UserInfo;
+}
+
 export interface RoomType {
   id: string;
   name: string;

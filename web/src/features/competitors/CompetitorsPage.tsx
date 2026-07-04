@@ -1,15 +1,13 @@
 import { useState } from 'react';
-import { useCompetitors, useProperties } from '../../api/hooks';
+import { useCompetitors } from '../../api/hooks';
+import { useSelectedProperty } from '../../app/PropertyContext';
 import { FreshnessBadge } from '../../components/FreshnessBadge';
 import { Money } from '../../components/Money';
 import { EmptyState, ErrorState, LoadingState } from '../../components/States';
 
 export function CompetitorsPage() {
-  const properties = useProperties();
-  const [selectedPropertyId, setSelectedPropertyId] = useState<string>('');
-  const property =
-    properties.data?.find((p) => p.id === selectedPropertyId) ??
-    properties.data?.[0];
+  // Property comes from the app-wide selector in the header.
+  const { properties, property } = useSelectedProperty();
   const competitors = useCompetitors(property?.id);
 
   // Form stub: tracking a new competitor will POST to
@@ -31,22 +29,6 @@ export function CompetitorsPage() {
         The properties we watch for you, with their most recently scraped
         nightly rates.
       </p>
-
-      <form className="filters" onSubmit={(event) => event.preventDefault()}>
-        <label className="field">
-          Property
-          <select
-            value={property?.id ?? ''}
-            onChange={(event) => setSelectedPropertyId(event.target.value)}
-          >
-            {properties.data.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-        </label>
-      </form>
 
       {competitors.isPending && <LoadingState what="competitors" />}
       {competitors.isError && <ErrorState error={competitors.error} />}

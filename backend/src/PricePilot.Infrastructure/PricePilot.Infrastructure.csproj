@@ -9,6 +9,8 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.*" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.*" />
     <PackageReference Include="EFCore.NamingConventions" Version="9.0.*" />
+    <!-- PasswordHasher<TUser> only (PBKDF2); no ASP.NET Identity stores/managers. -->
+    <PackageReference Include="Microsoft.Extensions.Identity.Core" Version="9.0.*" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.*">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

@@ -1,5 +1,7 @@
 using System.Text;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using PricePilot.Api.Auth;
@@ -65,6 +67,9 @@ if (string.IsNullOrWhiteSpace(signingKey))
     signingKey = "dev-only-insecure-signing-key-0123456789abcdef";
 }
 
+// Issues the tokens /auth/login returns; validated by AddJwtBearer below (same key).
+builder.Services.AddSingleton(new JwtTokenIssuer(signingKey));
+
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -96,6 +101,21 @@ builder.Services.AddAuthorization(options =>
     });
 });
 
+// Brute-force protection for /auth/login: fixed window of 10 attempts/min per client IP.
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy(AuthConstants.LoginRateLimitPolicy, httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+            }));
+});
+
 const string devCorsPolicy = "dev-cors";
 if (isDevelopment)
 {
@@ -112,11 +132,13 @@ if (isDevelopment)
     app.UseCors(devCorsPolicy);
 }
 
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 
 var api = app.MapGroup("/api/v1");
 api.MapHealthEndpoints();
+api.MapAuthEndpoints();
 api.MapPropertyEndpoints();
 api.MapRecommendationEndpoints();
 api.MapEventEndpoints();
@@ -131,4 +153,22 @@ if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
     await db.Database.MigrateAsync();
 }
 
+// Demo seeding (shared/contracts/demo-seed.md): opt-in, Development-only, after migrations.
+if (app.Configuration.GetValue<bool>("Demo:SeedOnStartup"))
+{
+    if (!isDevelopment)
+    {
+        app.Logger.LogWarning(
+            "Demo__SeedOnStartup=true is refused outside Development; skipping demo seeding.");
+    }
+    else
+    {
+        using var scope = app.Services.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<DemoSeeder>().SeedAsync();
+    }
+}
+
 await app.RunAsync();
+
+/// <summary>Exposes the entry point to WebApplicationFactory-based tests.</summary>
+public partial class Program;

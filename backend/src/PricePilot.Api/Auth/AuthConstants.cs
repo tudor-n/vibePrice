@@ -11,4 +11,7 @@ public static class AuthConstants
 
     /// <summary>Claim carrying the tenant id in production JWTs.</summary>
     public const string TenantClaim = "tenant_id";
+
+    /// <summary>Fixed-window rate limiter policy applied to POST /auth/login (per client IP).</summary>
+    public const string LoginRateLimitPolicy = "login";
 }

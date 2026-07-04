@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
 import {
-  useProperties,
   useRecommendations,
   useUpdateRecommendationStatus,
 } from '../../api/hooks';
+import { useSelectedProperty } from '../../app/PropertyContext';
 import type { Recommendation } from '../../api/types';
 import { EmptyState, ErrorState, LoadingState } from '../../components/States';
 import { RecommendationCard } from './RecommendationCard';
@@ -46,12 +46,8 @@ function groupByPeriod(recommendations: Recommendation[]): Map<string, Recommend
 
 export function RecommendationsPage() {
   const [{ from, to }, setRange] = useState(defaultRange);
-  const properties = useProperties();
-  const [selectedPropertyId, setSelectedPropertyId] = useState<string>('');
-
-  const property =
-    properties.data?.find((p) => p.id === selectedPropertyId) ??
-    properties.data?.[0];
+  // Property comes from the app-wide selector in the header.
+  const { properties, property } = useSelectedProperty();
 
   const recommendations = useRecommendations(property?.id, from, to);
   const updateStatus = useUpdateRecommendationStatus();
@@ -83,19 +79,6 @@ export function RecommendationsPage() {
       </p>
 
       <form className="filters" onSubmit={(event) => event.preventDefault()}>
-        <label className="field">
-          Property
-          <select
-            value={property?.id ?? ''}
-            onChange={(event) => setSelectedPropertyId(event.target.value)}
-          >
-            {properties.data.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-        </label>
         <label className="field">
           From
           <input
