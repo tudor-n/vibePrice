@@ -34,3 +34,6 @@ select = ["E", "W", "F", "I", "UP", "B"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "integration: needs the dev PostgreSQL (docker compose up -d db + backend EF migrations); auto-skipped when unreachable",
+]

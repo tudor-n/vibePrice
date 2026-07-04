@@ -16,8 +16,11 @@ backend only through PostgreSQL and the `jobs` table (`shared/contracts/`).
 | `src/pricepilot/engine/rules/` | pure pricing rules, ordered in `RULES` |
 | `src/pricepilot/engine/pipeline.py` | combines rule adjustments into a price |
 | `src/pricepilot/engine/explainer.py` | builds the `factors` JSON (contract shape) |
+| `src/pricepilot/engine/serialization.py` | Decimal→JSON boundary for JSONB persistence |
 | `src/pricepilot/scheduler/` | APScheduler enqueues + jobs-table polling worker |
+| `src/pricepilot/demo/seed.py` | idempotent demo seeder (`shared/contracts/demo-seed.md`) |
 | `tests/fixtures/` | saved HTML for scraper tests — never live sites |
+| `tests/integration/` | DB-backed e2e tests (`integration` marker, auto-skip when DB down) |
 
 ## Commands
 
@@ -30,12 +33,57 @@ py -3.12 -m venv .venv                                # once
 
 (Linux/CI: `python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"` etc.)
 
+### Integration tests + demo seed (dev database)
+
+Integration tests live in `tests/integration/`, are marked `integration`, and
+auto-skip when the database is unreachable (2s probe) or migrations are missing.
+To run them for real:
+
+```powershell
+# 1. Postgres (repo root)
+docker compose up -d db
+
+# 2. Schema — backend owns it; apply EF migrations (read-only use of backend tooling)
+cd backend
+dotnet tool restore
+dotnet tool run dotnet-ef database update --project src/PricePilot.Infrastructure `
+  --startup-project src/PricePilot.Api `
+  --connection "Host=localhost;Port=5432;Database=pricepilot;Username=pricepilot;Password=devpassword"
+
+# 3. Tests (dataplane) — DATABASE_URL defaults to the docker dev DB when unset
+cd ..\dataplane
+$env:DATABASE_URL = "postgresql+psycopg://pricepilot:devpassword@localhost:5432/pricepilot"
+.venv\Scripts\python -m pytest
+```
+
+Demo seed (dataplane-owned tables per `shared/contracts/demo-seed.md`: events,
+120 days of scraped_rates for the 3 fixed competitors, one succeeded scrape_run):
+
+```powershell
+.venv\Scripts\python -m pricepilot.demo.seed   # idempotent; needs DATABASE_URL as above
+```
+
+The seeder requires the backend-owned demo rows (tenant/property/room
+types/competitors). Until the backend demo seeder ships, running the
+integration tests once (`pytest tests/integration`) inserts them as a test
+fixture stand-in with the contract's fixed UUIDs.
+
 ## Conventions
 
 - **Money is `Decimal`, never float.** Quantize prices with `ROUND_FLOOR` /
   `ROUND_DOWN` — recommended prices round DOWN to whole currency units, never
   above the computed cap (see `recommendation-factors.md`). Currency travels
   with every amount.
+- **Decimal→JSONB boundary**: the factors payload is persisted via
+  `engine/serialization.py::to_jsonable` — Decimals quantized to 2dp then
+  emitted as JSON numbers (floats exist ONLY in the serialized payload, never
+  in computation; lossless for `numeric(10,2)` — tested in
+  `tests/test_serialization.py`).
+- **Idempotent writes**: seeder/ingest rows use deterministic `uuid5` ids from
+  natural keys (events: city+name+start_date; demo rates:
+  competitor_id+stay_date) with `INSERT ... ON CONFLICT (id) DO UPDATE`.
+  The engine replaces PENDING recommendations per (room_type_id, stay_date)
+  and never touches accepted/dismissed rows.
 - **Engine rules are pure functions**: `RuleContext` in, `FactorResult` out,
   no I/O, no clocks, no randomness. Every branch returns a human-readable
   English `reason`.

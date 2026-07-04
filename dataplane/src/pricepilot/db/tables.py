@@ -76,10 +76,10 @@ class RoomType(Base):
     tenant_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("tenants.id"))
     property_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("properties.id"))
     name: Mapped[str] = mapped_column(String(200))
+    capacity: Mapped[int] = mapped_column(Integer)
     base_price: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     current_price: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     currency: Mapped[str] = mapped_column(String(3))
-    created_at: Mapped[datetime]
 
 
 class Competitor(Base):
@@ -89,8 +89,7 @@ class Competitor(Base):
     tenant_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("tenants.id"))
     property_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("properties.id"))
     name: Mapped[str] = mapped_column(String(200))
-    source: Mapped[str] = mapped_column(String(50))
-    source_url: Mapped[str] = mapped_column(Text)
+    source_url: Mapped[str] = mapped_column(String(2000))
     created_at: Mapped[datetime]
 
 
@@ -114,8 +113,8 @@ class ScrapeRun(Base):
     __tablename__ = "scrape_runs"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    source: Mapped[str] = mapped_column(String(50))
-    status: Mapped[str] = mapped_column(String(20))
+    source: Mapped[str] = mapped_column(String(100))
+    status: Mapped[str] = mapped_column(String(50))
     started_at: Mapped[datetime] = mapped_column(default=_utcnow)
     finished_at: Mapped[datetime | None]
     error: Mapped[str | None] = mapped_column(Text)
@@ -132,6 +131,7 @@ class Event(Base):
     start_date: Mapped[date]
     end_date: Mapped[date]
     impact_score: Mapped[int] = mapped_column(Integer)  # 0-100
+    source: Mapped[str] = mapped_column(String(100))
     created_at: Mapped[datetime] = mapped_column(default=_utcnow)
 
 
@@ -142,11 +142,11 @@ class DemandSignal(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     city: Mapped[str] = mapped_column(String(100))
-    source: Mapped[str] = mapped_column(String(50))
-    metric: Mapped[str] = mapped_column(String(100))
-    observed_on: Mapped[date]
+    signal_type: Mapped[str] = mapped_column(String(100))
+    signal_date: Mapped[date]
     value: Mapped[Decimal] = mapped_column(Numeric(14, 4))
-    captured_at: Mapped[datetime] = mapped_column(default=_utcnow)
+    source: Mapped[str] = mapped_column(String(100))
+    created_at: Mapped[datetime] = mapped_column(default=_utcnow)
 
 
 class Recommendation(Base):
@@ -162,10 +162,11 @@ class Recommendation(Base):
     current_price: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     recommended_price: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     currency: Mapped[str] = mapped_column(String(3))
-    expected_impact: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+    expected_impact: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     factors: Mapped[dict[str, Any]]  # shape: shared/contracts/recommendation-factors.md
     status: Mapped[str] = mapped_column(String(20), default="pending")
     created_at: Mapped[datetime] = mapped_column(default=_utcnow)
+    decided_at: Mapped[datetime | None]  # backend-written when status leaves 'pending'
 
 
 class OwnBooking(Base):
