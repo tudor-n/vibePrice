@@ -1,0 +1,65 @@
+using System.Text.Json;
+
+namespace PricePilot.Application;
+
+// DTOs mirror shared/contracts/openapi.yaml. JSON is serialized camelCase by ASP.NET Core defaults.
+// Money is always decimal; stay dates are DateOnly; instants are DateTimeOffset (UTC).
+
+public sealed record RoomTypeDto(
+    Guid Id,
+    string Name,
+    int Capacity,
+    decimal BasePrice,
+    decimal CurrentPrice,
+    string Currency);
+
+public sealed record PropertyDto(
+    Guid Id,
+    string Name,
+    string City,
+    string? Address,
+    IReadOnlyList<RoomTypeDto> RoomTypes);
+
+public sealed record PropertyCreateDto(string Name, string City, string? Address);
+
+public sealed record RecommendationDto(
+    Guid Id,
+    Guid RoomTypeId,
+    DateOnly StayDate,
+    decimal CurrentPrice,
+    decimal RecommendedPrice,
+    string Currency,
+    decimal ExpectedImpact,
+    string Status,
+    JsonElement? Factors,
+    DateTimeOffset CreatedAt);
+
+public sealed record CompetitorRateDto(
+    DateOnly StayDate,
+    decimal Price,
+    string Currency,
+    DateTimeOffset CapturedAt);
+
+public sealed record CompetitorDto(
+    Guid Id,
+    string Name,
+    string SourceUrl,
+    IReadOnlyList<CompetitorRateDto> LatestRates);
+
+public sealed record CompetitorCreateDto(string Name, string SourceUrl);
+
+public sealed record EventDto(
+    Guid Id,
+    string City,
+    string Name,
+    DateOnly StartDate,
+    DateOnly EndDate,
+    int ImpactScore);
+
+public sealed record JobDto(
+    Guid Id,
+    string Type,
+    string Status,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset? FinishedAt,
+    string? Error);

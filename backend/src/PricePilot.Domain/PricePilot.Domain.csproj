@@ -1,0 +1,3 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Domain layer: entities and enums only. ZERO dependencies by design. -->
+</Project>

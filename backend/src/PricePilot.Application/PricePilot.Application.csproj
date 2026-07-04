@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Application layer: DTOs + service interfaces. Depends on Domain only. -->
+  <ItemGroup>
+    <ProjectReference Include="..\PricePilot.Domain\PricePilot.Domain.csproj" />
+  </ItemGroup>
+</Project>
