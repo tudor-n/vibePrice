@@ -16,7 +16,21 @@ Living document — update when work lands. Conventions: `[x]` done+verified, `[
 - [x] Dataplane: `_load_rule_contexts` reads real data from Postgres; idempotent recommendation persistence (pending replaced, decided preserved); `ingest.events` persists static Sibiu events (uuid5 upsert); deterministic demo rates `python -m pricepilot.demo.seed`; SQLAlchemy mapping drift vs migration fixed — 64 tests incl. 4 live integration
 - [x] Web: login page (RO error string, dev credentials hint), Bearer client + 401 handling, route guard, real property selector via context — 37 tests
 - [x] HTTP e2e smoke passed: login → 1 property → 64 recommendations (1-month window, all 5 factor rules) → 3 events; wrong tenant sees 0 properties
-- [x] Wave-2 code review (repo code-reviewer rules) — findings addressed
+- [x] Wave-2 code review (repo code-reviewer rules) — verdict REQUEST CHANGES, findings saved below, NOT yet fixed
+
+## MUST DO next session — wave-2 review findings (verified, unfixed)
+
+Major (fix before building anything on the auth surface):
+
+- [ ] **No unique index on `users.email`** (`AppDbContext.cs:51-58`, `AuthService.cs:36-38`): login does a keyed lookup assuming uniqueness — duplicates would log into an arbitrary tenant. Comparison is case-sensitive vs lowercased input. Fix: EF migration with unique index on lowered/normalized email + normalize on every write path (AuthService, DemoSeeder). Schema change ⇒ same-PR SQLAlchemy note per contract.
+- [ ] **Login rate limiter partitions on `Connection.RemoteIpAddress`, no forwarded-headers handling** (`Program.cs:105-117`): behind any reverse proxy all clients share one 10/min bucket ⇒ trivial login DoS, and per-IP brute-force protection is void. Fix: `UseForwardedHeaders` with `KnownProxies`/`KnownNetworks` gated by env for the VPS topology (and/or per-account partition key); document deployment requirement next to the policy.
+
+Minor (ride along):
+
+- [ ] JWT startup guard only checks key non-empty; HS256 needs ≥128-bit — enforce ≥32 bytes at boot (`Program.cs:57-71`, `JwtTokenIssuer.cs:19-21`) or production 500s on every login with a short key.
+- [ ] `dataplane/db/tables.py` residual drift: `OwnBooking` missing NOT NULL `source`; `Event.name` String(200) vs varchar(300) in migration.
+- [ ] Engine handler never cleans pending rows with `stay_date < today` (delete scope is `>= today`) — they accumulate forever. Add past-pending cleanup for in-scope room types; consider partial unique index on pending `(room_type_id, stay_date)` before scaling workers.
+- [ ] `explainer.py:7-9` docstring still points at superseded psycopg Jsonb serialization (real boundary is `engine/serialization.py::to_jsonable`); also give `to_jsonable` a defensive str-or-raise branch for unknown types instead of silent pass-through.
 
 ## Backlog (ordered roughly by value)
 
