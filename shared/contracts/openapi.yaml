@@ -1,0 +1,222 @@
+openapi: "3.1.0"
+info:
+  title: PricePilot API
+  version: "0.1.0"
+  description: >
+    Dashboard-facing API. Source of truth for the web client. The backend implements
+    this spec; the web client generates its types from it. Update this file in the
+    same PR as any endpoint change.
+servers:
+  - url: /api/v1
+paths:
+  /health:
+    get:
+      summary: Liveness/readiness probe
+      responses:
+        "200": { description: OK }
+  /properties:
+    get:
+      summary: List properties for the current tenant
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Property" }
+    post:
+      summary: Create a property
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PropertyCreate" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Property" }
+  /properties/{propertyId}/recommendations:
+    get:
+      summary: Dated price recommendations for a property
+      parameters:
+        - { name: propertyId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: from, in: query, schema: { type: string, format: date } }
+        - { name: to, in: query, schema: { type: string, format: date } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Recommendation" }
+  /recommendations/{recommendationId}/status:
+    post:
+      summary: Accept or dismiss a recommendation
+      parameters:
+        - { name: recommendationId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [accepted, dismissed] }
+      responses:
+        "200": { description: Updated }
+  /properties/{propertyId}/competitors:
+    get:
+      summary: Tracked competitors and their latest scraped rates
+      parameters:
+        - { name: propertyId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Competitor" }
+    post:
+      summary: Track a new competitor
+      parameters:
+        - { name: propertyId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CompetitorCreate" }
+      responses:
+        "201": { description: Created }
+  /events:
+    get:
+      summary: Events for a city
+      parameters:
+        - { name: city, in: query, required: true, schema: { type: string } }
+        - { name: from, in: query, schema: { type: string, format: date } }
+        - { name: to, in: query, schema: { type: string, format: date } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Event" }
+  /jobs:
+    post:
+      summary: Trigger a dataplane job (e.g. refresh now)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type]
+              properties:
+                type: { type: string, description: "See shared/contracts/jobs.md" }
+                payload: { type: object }
+      responses:
+        "202":
+          description: Queued
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Job" }
+  /jobs/{jobId}:
+    get:
+      summary: Job status
+      parameters:
+        - { name: jobId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Job" }
+components:
+  schemas:
+    Property:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        city: { type: string }
+        address: { type: string }
+        roomTypes:
+          type: array
+          items: { $ref: "#/components/schemas/RoomType" }
+    PropertyCreate:
+      type: object
+      required: [name, city]
+      properties:
+        name: { type: string }
+        city: { type: string }
+        address: { type: string }
+    RoomType:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        capacity: { type: integer }
+        basePrice: { type: number }
+        currentPrice: { type: number }
+        currency: { type: string }
+    Recommendation:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        roomTypeId: { type: string, format: uuid }
+        stayDate: { type: string, format: date }
+        currentPrice: { type: number }
+        recommendedPrice: { type: number }
+        currency: { type: string }
+        expectedImpact: { type: number }
+        status: { type: string, enum: [pending, accepted, dismissed] }
+        factors:
+          type: object
+          description: "Opaque reasoning payload; shape in shared/contracts/recommendation-factors.md"
+        createdAt: { type: string, format: date-time }
+    Competitor:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        sourceUrl: { type: string }
+        latestRates:
+          type: array
+          items:
+            type: object
+            properties:
+              stayDate: { type: string, format: date }
+              price: { type: number }
+              currency: { type: string }
+              capturedAt: { type: string, format: date-time }
+    CompetitorCreate:
+      type: object
+      required: [name, sourceUrl]
+      properties:
+        name: { type: string }
+        sourceUrl: { type: string, description: "OTA listing URL to scrape" }
+    Event:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        city: { type: string }
+        name: { type: string }
+        startDate: { type: string, format: date }
+        endDate: { type: string, format: date }
+        impactScore: { type: integer, minimum: 0, maximum: 100 }
+    Job:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        type: { type: string }
+        status: { type: string, enum: [queued, running, succeeded, failed] }
+        createdAt: { type: string, format: date-time }
+        finishedAt: { type: string, format: date-time }
+        error: { type: string }

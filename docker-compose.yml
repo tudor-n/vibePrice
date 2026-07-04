@@ -1,0 +1,57 @@
+name: pricepilot
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-pricepilot}
+      POSTGRES_USER: ${POSTGRES_USER:-pricepilot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devpassword}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pricepilot} -d ${POSTGRES_DB:-pricepilot}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: ./backend
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__Default: Host=db;Port=5432;Database=${POSTGRES_DB:-pricepilot};Username=${POSTGRES_USER:-pricepilot};Password=${POSTGRES_PASSWORD:-devpassword}
+      JWT_SIGNING_KEY: ${JWT_SIGNING_KEY:-dev-only-change-me-32-chars-minimum!!}
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  dataplane:
+    build:
+      context: ./dataplane
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-pricepilot}:${POSTGRES_PASSWORD:-devpassword}@db:5432/${POSTGRES_DB:-pricepilot}
+      SCRAPER_USER_AGENT: ${SCRAPER_USER_AGENT:-Mozilla/5.0 (compatible; PricePilotBot/0.1)}
+      SCRAPER_PROXY_URL: ${SCRAPER_PROXY_URL:-}
+      SCHEDULER_ENABLED: ${SCHEDULER_ENABLED:-true}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ./web
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8080/api/v1}
+    ports:
+      - "5173:80"
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
