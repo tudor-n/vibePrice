@@ -14,6 +14,31 @@ paths:
       summary: Liveness/readiness probe
       responses:
         "200": { description: OK }
+  /auth/login:
+    post:
+      summary: Exchange credentials for a JWT bearer token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        "200":
+          description: Authenticated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token: { type: string, description: "JWT (HS256); send as Authorization: Bearer <token>" }
+                  expiresAt: { type: string, format: date-time }
+                  user: { $ref: "#/components/schemas/UserInfo" }
+        "401": { description: Invalid credentials }
   /properties:
     get:
       summary: List properties for the current tenant
@@ -140,6 +165,14 @@ paths:
               schema: { $ref: "#/components/schemas/Job" }
 components:
   schemas:
+    UserInfo:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string }
+        displayName: { type: string }
+        role: { type: string }
+        tenantId: { type: string, format: uuid }
     Property:
       type: object
       properties:
