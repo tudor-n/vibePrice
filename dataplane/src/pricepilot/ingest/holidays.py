@@ -7,7 +7,17 @@ year works and legal changes are tracked upstream; persist into
 ``demand_signals`` (source="holidays").
 """
 
+import logging
 from datetime import date
+from decimal import Decimal
+
+from pricepilot.ingest.demand_signals import DemandSignalRecord
+
+logger = logging.getLogger(__name__)
+
+HOLIDAY_SIGNAL_TYPE = "public_holiday"
+HOLIDAYS_SOURCE = "holidays"
+_HOLIDAY_VALUE = Decimal("1")  # presence flag (numeric(14,4))
 
 _HOLIDAYS_2026: list[date] = [
     date(2026, 1, 1),  # New Year's Day
@@ -36,3 +46,31 @@ def romanian_public_holidays(year: int) -> list[date]:
             f"Only 2026 is hardcoded; use the `holidays` package for year {year} (TODO)."
         )
     return list(_HOLIDAYS_2026)
+
+
+def holiday_signal_records(city: str, year: int) -> list[DemandSignalRecord]:
+    """Public holidays of ``year`` as city-scoped demand-signal flags.
+
+    Raises ``NotImplementedError`` for a year the source cannot supply — callers
+    that span multiple years should use :func:`supported_holiday_records`.
+    """
+    return [
+        DemandSignalRecord(
+            city=city,
+            signal_type=HOLIDAY_SIGNAL_TYPE,
+            signal_date=holiday,
+            value=_HOLIDAY_VALUE,
+        )
+        for holiday in romanian_public_holidays(year)
+    ]
+
+
+def supported_holiday_records(city: str, years: list[int]) -> list[DemandSignalRecord]:
+    """Holiday flags for every supported year in ``years`` (unsupported skipped)."""
+    records: list[DemandSignalRecord] = []
+    for year in years:
+        try:
+            records.extend(holiday_signal_records(city, year))
+        except NotImplementedError:
+            logger.warning("Skipping holidays for unsupported year %d (source TODO)", year)
+    return records
