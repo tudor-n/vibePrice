@@ -17,7 +17,7 @@ from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import TIMESTAMP, Date, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import CHAR, TIMESTAMP, Date, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -81,7 +81,7 @@ class RoomType(Base):
     capacity: Mapped[int] = mapped_column(Integer)
     base_price: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     current_price: Mapped[Decimal] = mapped_column(Numeric(10, 2))
-    currency: Mapped[str] = mapped_column(String(3))
+    currency: Mapped[str] = mapped_column(CHAR(3))
 
 
 class Competitor(Base):
@@ -107,7 +107,7 @@ class ScrapedRate(Base):
     competitor_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("competitors.id"))
     stay_date: Mapped[date]
     price: Mapped[Decimal] = mapped_column(Numeric(10, 2))
-    currency: Mapped[str] = mapped_column(String(3))
+    currency: Mapped[str] = mapped_column(CHAR(3))
     captured_at: Mapped[datetime] = mapped_column(default=_utcnow)
 
 
@@ -163,7 +163,7 @@ class Recommendation(Base):
     stay_date: Mapped[date]
     current_price: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     recommended_price: Mapped[Decimal] = mapped_column(Numeric(10, 2))
-    currency: Mapped[str] = mapped_column(String(3))
+    currency: Mapped[str] = mapped_column(CHAR(3))
     expected_impact: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     factors: Mapped[dict[str, Any]]  # shape: shared/contracts/recommendation-factors.md
     status: Mapped[str] = mapped_column(String(20), default="pending")
@@ -182,7 +182,7 @@ class OwnBooking(Base):
     room_type_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("room_types.id"))
     stay_date: Mapped[date]
     price: Mapped[Decimal] = mapped_column(Numeric(10, 2))
-    currency: Mapped[str] = mapped_column(String(3))
+    currency: Mapped[str] = mapped_column(CHAR(3))
     booked_at: Mapped[datetime]
     source: Mapped[str] = mapped_column(String(100))
 
