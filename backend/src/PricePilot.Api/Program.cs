@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using PricePilot.Api;
 using PricePilot.Api.Auth;
 using PricePilot.Api.Endpoints;
 using PricePilot.Application;
@@ -63,8 +64,19 @@ if (string.IsNullOrWhiteSpace(signingKey))
             "JWT_SIGNING_KEY must be set outside Development. Refusing to start without auth configured.");
     }
 
-    // TODO(auth): dev-only placeholder key; never used outside Development.
+    // TODO(auth): dev-only placeholder key; never used outside Development. Long enough
+    // to satisfy the ≥32-byte HS256 minimum enforced below.
     signingKey = "dev-only-insecure-signing-key-0123456789abcdef";
+}
+
+// HS256 needs a ≥256-bit key: Microsoft.IdentityModel rejects shorter SymmetricSecurityKeys
+// at signing time, so a short key would boot fine and then 500 on every login. Fail fast
+// instead (JwtTokenIssuer repeats the check as defense in depth).
+if (Encoding.UTF8.GetByteCount(signingKey) < JwtTokenIssuer.MinSigningKeyBytes)
+{
+    throw new InvalidOperationException(
+        $"JWT_SIGNING_KEY must be at least {JwtTokenIssuer.MinSigningKeyBytes} UTF-8 bytes (256 bits) " +
+        "for HS256 signing. Refusing to start with a key that would fail on every login.");
 }
 
 // Issues the tokens /auth/login returns; validated by AddJwtBearer below (same key).
@@ -101,7 +113,27 @@ builder.Services.AddAuthorization(options =>
     });
 });
 
+// ---------------------------------------------------------------------------
+// Reverse-proxy support (opt-in). Behind the VPS reverse proxy (Caddy) every request
+// arrives from the proxy's IP, so the per-IP login rate limiter below degrades to one
+// shared bucket unless X-Forwarded-For is honored. DEPLOYMENT REQUIREMENT: when running
+// behind a proxy, set ForwardedHeaders__Enabled=true and name the proxy in
+// ForwardedHeaders__KnownProxies / ForwardedHeaders__KnownNetworks (see .env.example).
+// Forwarded headers are never trusted unless explicitly enabled and configured.
+// ---------------------------------------------------------------------------
+var forwardedHeadersEnabled = builder.Configuration.GetValue<bool>("ForwardedHeaders:Enabled");
+if (forwardedHeadersEnabled)
+{
+    builder.Services.Configure<ForwardedHeadersOptions>(options => ForwardedHeadersSetup.Configure(
+        options,
+        builder.Configuration["ForwardedHeaders:KnownProxies"],
+        builder.Configuration["ForwardedHeaders:KnownNetworks"]));
+}
+
 // Brute-force protection for /auth/login: fixed window of 10 attempts/min per client IP.
+// Partitioned by IP only (not by account email): the partition key callback is synchronous
+// and has no parsed request body, so keying on email would require buffering/double-reading
+// the body. With forwarded headers configured (above), per-client IP limiting is effective.
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -126,6 +158,12 @@ if (isDevelopment)
 }
 
 var app = builder.Build();
+
+// Must run before UseRateLimiter so the limiter partitions on the real client IP.
+if (forwardedHeadersEnabled)
+{
+    app.UseForwardedHeaders();
+}
 
 if (isDevelopment)
 {

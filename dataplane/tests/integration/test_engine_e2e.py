@@ -18,7 +18,7 @@ fixture — runtime dataplane code never writes backend-owned tables.
 """
 
 import os
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -243,6 +243,52 @@ def test_rerun_replaces_pending_without_duplicates(session: Session) -> None:
     assert result["generated"] == 2 * HORIZON_DAYS
     assert sorted(second_keys) == sorted(first_keys)
     assert len(second_keys) == len(set(second_keys)), "duplicate pending (room_type, stay_date)"
+
+
+def _past_recommendation(status: str, *, days_ago: int) -> Recommendation:
+    """A recommendation whose stay date has already passed (purge-test rows)."""
+    return Recommendation(
+        tenant_id=TENANT_ID,
+        property_id=PROPERTY_ID,
+        room_type_id=ROOM_DOUBLE_ID,
+        stay_date=date.today() - timedelta(days=days_ago),
+        current_price=Decimal("350.00"),
+        recommended_price=Decimal("360.00"),
+        currency="RON",
+        expected_impact=Decimal("7.00"),
+        factors={"note": "past-dated row for purge test"},
+        status=status,
+        decided_at=None if status == "pending" else datetime.now(UTC),
+    )
+
+
+def test_rerun_purges_past_pending_but_never_past_decisions(session: Session) -> None:
+    # Clean slate for this tenant: earlier tests in the module leave decided rows.
+    session.execute(
+        text("DELETE FROM recommendations WHERE tenant_id = :tenant"), {"tenant": TENANT_ID}
+    )
+    seed(session)
+    session.commit()
+
+    stale_pending = _past_recommendation("pending", days_ago=3)
+    past_dismissed = _past_recommendation("dismissed", days_ago=2)
+    session.add_all([stale_pending, past_dismissed])
+    session.commit()
+    stale_pending_id, past_dismissed_id = stale_pending.id, past_dismissed.id
+
+    result = handle_generate_recommendations(session, ENGINE_PAYLOAD)
+    session.commit()
+    session.expire_all()
+
+    assert session.get(Recommendation, stale_pending_id) is None, (
+        "past-dated pending row survived the re-run — stale pending rows accumulate"
+    )
+    survivor = session.get(Recommendation, past_dismissed_id)
+    assert survivor is not None, "decided (dismissed) row was deleted — decisions must survive"
+    assert survivor.status == "dismissed"
+    # Past rows are outside the horizon: they never affect generated/skipped counts.
+    assert result == {"generated": 2 * HORIZON_DAYS, "skipped": 0}
+    assert len(_pending_keys(session)) == 2 * HORIZON_DAYS
 
 
 def test_accepted_rows_survive_reruns_untouched(session: Session) -> None:

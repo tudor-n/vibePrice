@@ -28,7 +28,9 @@ public sealed class AuthService(AppDbContext db, IPasswordHasher<User> passwordH
 
     public async Task<UserInfoDto?> LoginAsync(string email, string password, CancellationToken ct = default)
     {
-        var normalizedEmail = email.Trim().ToLowerInvariant();
+        // users.email is stored normalized (User.NormalizeEmail invariant + unique index),
+        // so normalizing the input makes plain equality a correct case-insensitive lookup.
+        var normalizedEmail = User.NormalizeEmail(email);
 
         // SYSTEM CODE — deliberate IgnoreQueryFilters: login happens before any tenant is
         // resolved, so the tenant global query filter would hide every user. The lookup is

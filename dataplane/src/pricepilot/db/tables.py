@@ -55,7 +55,9 @@ class User(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
     tenant_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("tenants.id"))
-    email: Mapped[str] = mapped_column(String(320))
+    # Stored normalized (trimmed + lowercased) by the backend; unique across tenants
+    # (ix_users_email) — login runs before tenant resolution.
+    email: Mapped[str] = mapped_column(String(320), unique=True)
     created_at: Mapped[datetime]
 
 
@@ -127,7 +129,7 @@ class Event(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     city: Mapped[str] = mapped_column(String(100))
-    name: Mapped[str] = mapped_column(String(200))
+    name: Mapped[str] = mapped_column(String(300))
     start_date: Mapped[date]
     end_date: Mapped[date]
     impact_score: Mapped[int] = mapped_column(Integer)  # 0-100
@@ -182,7 +184,7 @@ class OwnBooking(Base):
     price: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     currency: Mapped[str] = mapped_column(String(3))
     booked_at: Mapped[datetime]
-    created_at: Mapped[datetime] = mapped_column(default=_utcnow)
+    source: Mapped[str] = mapped_column(String(100))
 
 
 class Job(Base):

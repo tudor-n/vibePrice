@@ -63,7 +63,8 @@ public sealed class DemoSeeder(AppDbContext db, IPasswordHasher<User> passwordHa
             {
                 Id = UserId,
                 TenantId = TenantId,
-                Email = DemoEmail,
+                // users.email invariant: always store the normalized form (see User.NormalizeEmail).
+                Email = User.NormalizeEmail(DemoEmail),
                 DisplayName = "Demo Owner",
                 PasswordHash = "",
                 Role = "owner",

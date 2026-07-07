@@ -21,12 +21,20 @@ from typing import Any
 
 _TWO_DP = Decimal("0.01")
 
+#: JSON-native scalars allowed through unchanged. bool is an int subclass but
+#: listed for clarity. Dates/datetimes are deliberately NOT allowed: callers
+#: convert them to ISO strings before this boundary (see ``engine.explainer``).
+_JSON_SCALARS = (str, int, float, bool)
+
 
 def to_jsonable(value: Any) -> Any:
     """Recursively convert a payload for JSON: Decimals become 2dp floats.
 
     Use only at the persistence boundary (JSONB columns); never feed the
-    result back into price arithmetic.
+    result back into price arithmetic. Anything that is not a Decimal, a
+    dict/list/tuple of convertibles, or a JSON-native scalar raises
+    ``TypeError`` here — at the cause — instead of failing (or silently
+    corrupting) later inside the JSON encoder.
     """
     if isinstance(value, Decimal):
         return float(value.quantize(_TWO_DP))
@@ -34,4 +42,11 @@ def to_jsonable(value: Any) -> Any:
         return {key: to_jsonable(item) for key, item in value.items()}
     if isinstance(value, (list, tuple)):
         return [to_jsonable(item) for item in value]
-    return value
+    if value is None or isinstance(value, _JSON_SCALARS):
+        return value
+    raise TypeError(
+        f"to_jsonable cannot serialize {type(value).__name__}: {value!r}. "
+        "Allowed: Decimal (emitted as 2dp float), dict, list/tuple, str, int, "
+        "float, bool, None. Convert dates/datetimes to ISO strings via "
+        ".isoformat() before this boundary (see engine.explainer)."
+    )

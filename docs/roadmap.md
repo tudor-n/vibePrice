@@ -18,24 +18,34 @@ Living document — update when work lands. Conventions: `[x]` done+verified, `[
 - [x] HTTP e2e smoke passed: login → 1 property → 64 recommendations (1-month window, all 5 factor rules) → 3 events; wrong tenant sees 0 properties
 - [x] Wave-2 code review (repo code-reviewer rules) — verdict REQUEST CHANGES, findings saved below, NOT yet fixed
 
-## MUST DO next session — wave-2 review findings (verified, unfixed)
+## Wave 2.1 (review fixes) — landed 2026-07-07
 
-Major (fix before building anything on the auth surface):
+All six wave-2 review findings fixed; code-reviewer re-run verdict **APPROVE** (no majors).
 
-- [ ] **No unique index on `users.email`** (`AppDbContext.cs:51-58`, `AuthService.cs:36-38`): login does a keyed lookup assuming uniqueness — duplicates would log into an arbitrary tenant. Comparison is case-sensitive vs lowercased input. Fix: EF migration with unique index on lowered/normalized email + normalize on every write path (AuthService, DemoSeeder). Schema change ⇒ same-PR SQLAlchemy note per contract.
-- [ ] **Login rate limiter partitions on `Connection.RemoteIpAddress`, no forwarded-headers handling** (`Program.cs:105-117`): behind any reverse proxy all clients share one 10/min bucket ⇒ trivial login DoS, and per-IP brute-force protection is void. Fix: `UseForwardedHeaders` with `KnownProxies`/`KnownNetworks` gated by env for the VPS topology (and/or per-account partition key); document deployment requirement next to the policy.
+- [x] **users.email**: unique index (`ix_users_email`, migration `20260707050444_AddUsersEmailUniqueIndex`) + normalized-email invariant (`User.NormalizeEmail`, trim+lowercase, applied on every write path and at login); SQLAlchemy mapping annotated `unique=True`; `table-ownership.md` updated. Tests: `UserEmailTests`, mixed-case login in `LoginEndpointTests`.
+- [x] **Rate limiter behind proxy**: `ForwardedHeadersSetup.cs` — opt-in `ForwardedHeaders__Enabled` + `KnownProxies`/`KnownNetworks` (fail-fast on bad/missing config), X-Forwarded-For only, applied before `UseRateLimiter`. Limiter stays IP-only (email partition rejected: partition callback is sync, no parsed body). **Deploy note: behind Caddy these env vars are REQUIRED** (`.env.example`, `backend/CLAUDE.md`).
+- [x] **JWT key guard**: ≥32 UTF-8 bytes enforced at startup (every environment) + `JwtTokenIssuer` constructor guard. Tests: `JwtKeyGuardTests`.
+- [x] **tables.py drift**: `OwnBooking.source` added, phantom `OwnBooking.created_at` removed (would fail at runtime), `Event.name` → String(300); new `tests/test_tables.py` pins column sets against the migration.
+- [x] **Past-pending purge**: engine replace-delete now also removes pending rows with `stay_date < today` for in-scope room types, same transaction; decided rows structurally excluded. Test: `test_rerun_purges_past_pending_but_never_past_decisions`.
+- [x] **Serialization boundary**: `to_jsonable` allowlists JSON-native scalars and raises `TypeError` otherwise (temporals must be `.isoformat()`ed first — explainer already does); explainer docstring points at the real boundary.
 
-Minor (ride along):
+Verified: backend `dotnet test` 36/36; dataplane `pytest` 76 passed / 1 environmental failure (below); `ruff` clean; migration applied to dev DB.
 
-- [ ] JWT startup guard only checks key non-empty; HS256 needs ≥128-bit — enforce ≥32 bytes at boot (`Program.cs:57-71`, `JwtTokenIssuer.cs:19-21`) or production 500s on every login with a short key.
-- [ ] `dataplane/db/tables.py` residual drift: `OwnBooking` missing NOT NULL `source`; `Event.name` String(200) vs varchar(300) in migration.
-- [ ] Engine handler never cleans pending rows with `stay_date < today` (delete scope is `>= today`) — they accumulate forever. Add past-pending cleanup for in-scope room types; consider partial unique index on pending `(room_type_id, stay_date)` before scaling workers.
-- [ ] `explainer.py:7-9` docstring still points at superseded psycopg Jsonb serialization (real boundary is `engine/serialization.py::to_jsonable`); also give `to_jsonable` a defensive str-or-raise branch for unknown types instead of silent pass-through.
+### Known dev-environment nit (not a code bug)
+
+`test_demo_seed_is_idempotent` fails against a dev DB volume that was seeded on an
+earlier day: past-dated `scraped_rates` rows fall out of the 120-day window and inflate
+the count (369 vs 360). Fails on `main` too. Fix either way:
+`docker compose exec db psql -U pricepilot -d pricepilot -c "DELETE FROM scraped_rates WHERE stay_date < current_date;"`
+(agents are not permitted to run this) — or pick up the backlog item to make the test
+window-scoped.
 
 ## Backlog (ordered roughly by value)
 
 - [x] End-to-end demo doc: `docs/demo.md` (compose/local, seed, engine run, login)
-- [ ] Schema-sync check (CI): SQLAlchemy models vs EF migration column diff — drift already bit once in wave 2
+- [ ] Schema-sync check (CI): SQLAlchemy models vs EF migration column diff — drift bit twice already (wave 2, wave 2.1); `dataplane/tests/test_tables.py` now pins some column sets, a full generated diff would close the class
+- [ ] Partial unique index on pending recommendations `(room_type_id, stay_date)` — deferred from wave-2 review ("consider before scaling workers"); backend-owned migration + SQLAlchemy note
+- [ ] Make `test_demo_seed_is_idempotent` robust to stale dev volumes (scope rate count to the current seed window) — see wave-2.1 known nit
 - [ ] Real Booking.com scraper (live fetch + anti-bot handling; parser pattern exists) — needs human-in-the-loop iteration
 - [ ] Airbnb scraper
 - [ ] INS Tempo tourism statistics ingestion (`ingest/tourism_stats.py`)

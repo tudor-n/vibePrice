@@ -296,10 +296,12 @@ def handle_generate_recommendations(session: Session, payload: dict[str, Any]) -
     """Recompute recommendations via the engine pipeline and persist them.
 
     Idempotency: PENDING rows for each in-scope (room_type_id, stay_date) are
-    replaced (deleted, then re-inserted from the fresh computation). Rows the
-    user already decided (accepted/dismissed — the backend flips status) are
-    never touched; their (room_type_id, stay_date) keys are skipped entirely
-    and counted in ``skipped``.
+    replaced (deleted, then re-inserted from the fresh computation), and stale
+    PENDING rows whose stay date has already passed are purged in the same
+    transaction so they never accumulate. Rows the user already decided
+    (accepted/dismissed — the backend flips status) are never touched,
+    whatever their date; in-horizon decided keys are skipped entirely and
+    counted in ``skipped``.
     """
     tenant_id = _parse_uuid(payload.get("tenant_id"))
     property_id = _parse_uuid(payload.get("property_id"))
@@ -332,7 +334,17 @@ def handle_generate_recommendations(session: Session, payload: dict[str, Any]) -
             )
         ).all()
     )
-    session.execute(delete(Recommendation).where(*in_scope, Recommendation.status == "pending"))
+    # Delete pending rows for the scoped room types (tenant isolation: the ids
+    # come from the tenant/property-scoped load above). No lower date bound on
+    # purpose — this both clears the horizon for re-insertion AND purges stale
+    # pending rows whose stay date has passed. Decided rows are never deleted.
+    session.execute(
+        delete(Recommendation).where(
+            Recommendation.room_type_id.in_(room_type_ids),
+            Recommendation.stay_date < horizon_end,
+            Recommendation.status == "pending",
+        )
+    )
 
     rows: list[dict[str, Any]] = []
     skipped = 0

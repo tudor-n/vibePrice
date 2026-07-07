@@ -4,9 +4,11 @@ The shape is a cross-runtime contract — ``shared/contracts/recommendation-fact
 Bump ``ENGINE_VERSION`` on any shape change and keep the dashboard renderer
 backward-compatible.
 
-Money values in the returned dict are ``Decimal`` (never float). When
-persisting, serialize with a Decimal-aware JSON encoder (e.g. psycopg
-``Jsonb(payload, dumps=...)``) so amounts stay exact JSON numbers.
+Money values in the returned dict are ``Decimal`` (never float), and dates/
+datetimes are converted to ISO strings here. Persist the payload through
+``pricepilot.engine.serialization.to_jsonable`` — the single Decimal→JSON
+boundary — which quantizes Decimals to 2dp JSON numbers and rejects any type
+it does not know how to serialize.
 """
 
 from datetime import UTC, date, datetime

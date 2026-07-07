@@ -51,6 +51,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
         modelBuilder.Entity<User>(e =>
         {
             e.HasIndex(x => x.TenantId);
+            // INVARIANT: emails are stored trimmed + lowercased (User.NormalizeEmail) on
+            // every write path, so this plain unique index also guarantees case-insensitive
+            // uniqueness and login can match with simple equality (AuthService.LoginAsync).
+            e.HasIndex(x => x.Email).IsUnique();
             e.Property(x => x.Email).HasMaxLength(320);
             e.Property(x => x.DisplayName).HasMaxLength(200);
             e.Property(x => x.Role).HasMaxLength(50);

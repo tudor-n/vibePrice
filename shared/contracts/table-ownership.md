@@ -15,7 +15,7 @@ EF Core entity + migration, and the SQLAlchemy model.
 | Table | Written by | Notes |
 |---|---|---|
 | `tenants` | backend | subscription fields included; no billing integration in v1 |
-| `users` | backend | |
+| `users` | backend | `email` is stored **normalized** (trimmed + lowercased) on every write path and has a plain **unique index** (`ix_users_email`) — uniqueness is global, not per tenant, because login looks users up by email before any tenant is resolved |
 | `properties` | backend | has `tenant_id` |
 | `room_types` | backend | has `tenant_id`; holds `base_price` and `current_price` |
 | `competitors` | backend | property↔competitor mapping; has `tenant_id` |

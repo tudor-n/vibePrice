@@ -78,12 +78,15 @@ fixture stand-in with the contract's fixed UUIDs.
   `engine/serialization.py::to_jsonable` — Decimals quantized to 2dp then
   emitted as JSON numbers (floats exist ONLY in the serialized payload, never
   in computation; lossless for `numeric(10,2)` — tested in
-  `tests/test_serialization.py`).
+  `tests/test_serialization.py`). The boundary is strict: unknown types raise
+  `TypeError` there; convert dates/datetimes to ISO strings first (the
+  explainer already does).
 - **Idempotent writes**: seeder/ingest rows use deterministic `uuid5` ids from
   natural keys (events: city+name+start_date; demo rates:
   competitor_id+stay_date) with `INSERT ... ON CONFLICT (id) DO UPDATE`.
-  The engine replaces PENDING recommendations per (room_type_id, stay_date)
-  and never touches accepted/dismissed rows.
+  The engine replaces PENDING recommendations per (room_type_id, stay_date),
+  purges past-dated PENDING rows for the in-scope room types in the same
+  transaction, and never touches accepted/dismissed rows regardless of date.
 - **Engine rules are pure functions**: `RuleContext` in, `FactorResult` out,
   no I/O, no clocks, no randomness. Every branch returns a human-readable
   English `reason`.

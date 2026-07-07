@@ -606,6 +606,10 @@ namespace PricePilot.Infrastructure.Migrations
                     b.HasKey("Id")
                         .HasName("pk_users");
 
+                    b.HasIndex("Email")
+                        .IsUnique()
+                        .HasDatabaseName("ix_users_email");
+
                     b.HasIndex("TenantId")
                         .HasDatabaseName("ix_users_tenant_id");
 

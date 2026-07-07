@@ -134,6 +134,21 @@ public sealed class LoginEndpointTests : IDisposable
     }
 
     [Fact]
+    public async Task Mixed_case_and_padded_email_logs_in()
+    {
+        using var client = _factory.CreateClient();
+
+        // users.email is stored normalized (trimmed + lowercased); login input is
+        // normalized the same way, so casing/whitespace differences must not matter.
+        var response = await LoginAsync(client, "  Demo@PricePilot.LOCAL ", DemoPassword);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<LoginResponseDto>(Json);
+        Assert.NotNull(body);
+        Assert.Equal(DemoEmail, body.User.Email);
+    }
+
+    [Fact]
     public async Task Wrong_password_and_unknown_email_return_identical_401s()
     {
         using var client = _factory.CreateClient();
@@ -190,6 +205,33 @@ public sealed class LoginEndpointTests : IDisposable
         }
 
         var throttled = await LoginAsync(client, "nobody@pricepilot.local", "wrong");
+        Assert.Equal(HttpStatusCode.TooManyRequests, throttled.StatusCode);
+    }
+
+    [Fact]
+    public async Task X_forwarded_for_cannot_bypass_the_rate_limit_unless_explicitly_enabled()
+    {
+        // ForwardedHeaders__Enabled is NOT set: a spoofed X-Forwarded-For must not create
+        // a fresh rate-limit partition per request (that would void brute-force protection).
+        using var client = _factory.CreateClient();
+
+        for (var i = 0; i < 10; i++)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/auth/login")
+            {
+                Content = JsonContent.Create(new { email = "nobody@pricepilot.local", password = "wrong" }),
+            };
+            request.Headers.Add("X-Forwarded-For", $"203.0.113.{i}");
+            var response = await client.SendAsync(request);
+            Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        }
+
+        using var throttledRequest = new HttpRequestMessage(HttpMethod.Post, "/api/v1/auth/login")
+        {
+            Content = JsonContent.Create(new { email = "nobody@pricepilot.local", password = "wrong" }),
+        };
+        throttledRequest.Headers.Add("X-Forwarded-For", "203.0.113.99");
+        var throttled = await client.SendAsync(throttledRequest);
         Assert.Equal(HttpStatusCode.TooManyRequests, throttled.StatusCode);
     }
 

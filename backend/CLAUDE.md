@@ -70,7 +70,12 @@ string; never used at runtime).
 - Real login exists: `POST /api/v1/auth/login` (anonymous, fixed-window rate limit
   10/min per IP) verifies credentials via `IAuthService` (Infrastructure, PBKDF2 through
   `PasswordHasher<User>`) and issues 12h HS256 JWTs signed with `JWT_SIGNING_KEY`
-  (`JwtTokenIssuer` in Api; claims `sub`, `tenant_id`, `email`, `role`).
+  (`JwtTokenIssuer` in Api; claims `sub`, `tenant_id`, `email`, `role`). Behind a reverse
+  proxy the rate limiter only works with `ForwardedHeaders__*` configured (see Config).
+- **`users.email` invariant**: stored **normalized** — trimmed + lowercased via
+  `User.NormalizeEmail` — on every write path, and backed by a global unique index
+  (`ix_users_email`). Login normalizes its input the same way and matches with plain
+  equality; uniqueness is cross-tenant because login runs before tenant resolution.
 - `DevHeaderTenantContext` (Development only) resolves the tenant from a validated Bearer
   token's `tenant_id` claim first, then falls back to the anonymous X-Tenant-Id header
   (web dev + tooling still work). Production uses `JwtClaimTenantContext` exclusively and
@@ -81,9 +86,12 @@ string; never used at runtime).
 | Variable | Purpose |
 |---|---|
 | `ConnectionStrings__Default` | Postgres connection string (required outside Development) |
-| `JWT_SIGNING_KEY` | Signs login-issued tokens and validates bearer tokens (required outside Development) |
+| `JWT_SIGNING_KEY` | Signs login-issued tokens and validates bearer tokens (required outside Development). **Must be ≥32 UTF-8 bytes** (HS256/256-bit minimum) — startup fails fast otherwise, in every environment |
 | `Database__MigrateOnStartup` | `true` ⇒ apply migrations on boot (docker compose) |
 | `Demo__SeedOnStartup` | `true` ⇒ run `DemoSeeder` after migrations; **Development only** (refused with a warning elsewhere) |
+| `ForwardedHeaders__Enabled` | `true` ⇒ honor `X-Forwarded-For` from the configured proxies (`ForwardedHeadersSetup`). **Required behind a reverse proxy** (VPS Caddy) or the per-IP login rate limiter collapses into one shared bucket. Never trusted by default |
+| `ForwardedHeaders__KnownProxies` | Comma-separated proxy IPs trusted to set `X-Forwarded-For`; with `KnownNetworks`, at least one is required when enabled (startup fails fast otherwise) |
+| `ForwardedHeaders__KnownNetworks` | Comma-separated CIDR networks (e.g. `172.18.0.0/16`) trusted to set `X-Forwarded-For` |
 
 ## Demo seeding
 

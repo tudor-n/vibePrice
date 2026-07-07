@@ -7,6 +7,7 @@ significant digits) ``Decimal -> float -> json -> Decimal`` is exact.
 """
 
 import json
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 import pytest
@@ -50,6 +51,30 @@ def test_to_jsonable_recurses_and_quantizes_to_2dp() -> None:
         "nested": {"pcts": [12.0, -3.5]},
         "untouched": ["RON", 3, None, True],
     }
+
+
+@pytest.mark.parametrize("scalar", ["RON", 3, 1.5, True, False, None])
+def test_json_scalars_pass_through_unchanged(scalar: object) -> None:
+    assert to_jsonable(scalar) == scalar
+
+
+def test_unknown_types_raise_type_error_at_the_boundary() -> None:
+    class Opaque:
+        pass
+
+    with pytest.raises(TypeError, match="Opaque"):
+        to_jsonable({"factors": [Opaque()]})
+
+
+@pytest.mark.parametrize(
+    "temporal",
+    [date(2026, 7, 7), datetime(2026, 7, 7, 12, 0, tzinfo=UTC)],
+)
+def test_raw_dates_and_datetimes_are_rejected_with_guidance(temporal: object) -> None:
+    # Callers convert temporals to ISO strings BEFORE the boundary (see
+    # engine.explainer); a raw date/datetime reaching here is an upstream bug.
+    with pytest.raises(TypeError, match="isoformat"):
+        to_jsonable(temporal)
 
 
 def test_real_factors_payload_serializes_without_decimals() -> None:
