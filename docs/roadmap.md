@@ -31,21 +31,45 @@ All six wave-2 review findings fixed; code-reviewer re-run verdict **APPROVE** (
 
 Verified: backend `dotnet test` 36/36; dataplane `pytest` 76 passed / 1 environmental failure (below); `ruff` clean; migration applied to dev DB.
 
-### Known dev-environment nit (not a code bug)
+### Known dev-environment nit — RESOLVED in wave 2.2
 
-`test_demo_seed_is_idempotent` fails against a dev DB volume that was seeded on an
-earlier day: past-dated `scraped_rates` rows fall out of the 120-day window and inflate
-the count (369 vs 360). Fails on `main` too. Fix either way:
-`docker compose exec db psql -U pricepilot -d pricepilot -c "DELETE FROM scraped_rates WHERE stay_date < current_date;"`
-(agents are not permitted to run this) — or pick up the backlog item to make the test
-window-scoped.
+`test_demo_seed_is_idempotent` used to fail against dev DB volumes seeded on an earlier
+day (stale past-dated `scraped_rates` inflating a global count). The test is now
+window-scoped; stale rows in dev volumes are harmless. (Optional cleanup if you want a
+tidy volume: `DELETE FROM scraped_rates WHERE stay_date < current_date;`.)
+
+## Wave 2.2 (schema-sync guard) — landed 2026-07-07
+
+Spec: `superpowers/specs/2026-07-07-schema-sync-check-design.md` · plan:
+`superpowers/plans/2026-07-07-schema-sync-check.md`.
+
+- [x] **Schema-sync check**: pure drift diff `dataplane/db/schema_check.py` (mapped
+  columns must exist with matching type/nullability everywhere; dataplane-WRITTEN tables
+  must be fully mapped; backend-only tables may be partial) + integration test
+  `test_schema_sync.py` reflecting the live schema. First run surfaced and fixed real
+  drift: 4× `currency` mapped `String(3)` vs `char(3)` in the DB.
+- [x] **CI `dataplane-integration` job**: Postgres 17 service + backend EF migrations
+  applied via dotnet tooling, then the full dataplane suite with
+  `PRICEPILOT_REQUIRE_DB=1` (unavailable DB = hard collection error, never a skip —
+  shared probe `tests/integration/dbprobe.py`). Integration tests now run in CI at all.
+- [x] **Partial unique index on pending recommendations** (deferred wave-2 "consider"):
+  migration `20260707053900_AddPendingRecommendationUniqueIndex` — unique
+  `(room_type_id, stay_date) WHERE status = 'pending'`; plain `room_type_id` FK index
+  kept explicitly (a partial index can't serve decided-row lookups). Contract note in
+  `table-ownership.md`.
+- [x] **Window-scoped `test_demo_seed_is_idempotent`** — stale dev volumes no longer
+  fail the suite.
+
+Verified: dataplane 86/86 passed (first fully green DB-backed run) + ruff clean;
+backend 37/37, build 0 warnings; both migrations applied to the dev DB; workflow
+linted with actionlint.
 
 ## Backlog (ordered roughly by value)
 
 - [x] End-to-end demo doc: `docs/demo.md` (compose/local, seed, engine run, login)
-- [ ] Schema-sync check (CI): SQLAlchemy models vs EF migration column diff — drift bit twice already (wave 2, wave 2.1); `dataplane/tests/test_tables.py` now pins some column sets, a full generated diff would close the class
-- [ ] Partial unique index on pending recommendations `(room_type_id, stay_date)` — deferred from wave-2 review ("consider before scaling workers"); backend-owned migration + SQLAlchemy note
-- [ ] Make `test_demo_seed_is_idempotent` robust to stale dev volumes (scope rate count to the current seed window) — see wave-2.1 known nit
+- [x] Schema-sync check (CI): SQLAlchemy models vs migrated schema diff — wave 2.2
+- [x] Partial unique index on pending recommendations `(room_type_id, stay_date)` — wave 2.2
+- [x] `test_demo_seed_is_idempotent` robust to stale dev volumes — wave 2.2
 - [ ] Real Booking.com scraper (live fetch + anti-bot handling; parser pattern exists) — needs human-in-the-loop iteration
 - [ ] Airbnb scraper
 - [ ] INS Tempo tourism statistics ingestion (`ingest/tourism_stats.py`)

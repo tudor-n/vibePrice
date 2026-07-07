@@ -11,6 +11,7 @@ backend only through PostgreSQL and the `jobs` table (`shared/contracts/`).
 | `src/pricepilot/config.py` | pydantic-settings `Settings` from env (12-factor) |
 | `src/pricepilot/db/session.py` | lazy engine + session factory |
 | `src/pricepilot/db/tables.py` | SQLAlchemy mappings of the backend-owned schema |
+| `src/pricepilot/db/schema_check.py` | drift diff: mappings vs reflected DB schema (CI-enforced) |
 | `src/pricepilot/scrapers/` | per-OTA scraper modules + `SCRAPERS` registry |
 | `src/pricepilot/ingest/` | events, holidays, INS tourism stats, weather |
 | `src/pricepilot/engine/rules/` | pure pricing rules, ordered in `RULES` |
@@ -36,8 +37,13 @@ py -3.12 -m venv .venv                                # once
 ### Integration tests + demo seed (dev database)
 
 Integration tests live in `tests/integration/`, are marked `integration`, and
-auto-skip when the database is unreachable (2s probe) or migrations are missing.
-To run them for real:
+auto-skip when the database is unreachable (2s probe) or migrations are missing
+(shared probe: `tests/integration/dbprobe.py`). CI runs the full suite against
+an EF-migrated Postgres in the `dataplane-integration` job with
+`PRICEPILOT_REQUIRE_DB=1` — there an unavailable DB is a hard failure, never a
+skip. The schema-sync check (`tests/integration/test_schema_sync.py`) fails on
+any drift between `db/tables.py` and the migrated schema — fix the mapping,
+never emit DDL. To run integration tests locally:
 
 ```powershell
 # 1. Postgres (repo root)

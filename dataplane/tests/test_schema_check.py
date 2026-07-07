@@ -1,8 +1,15 @@
 """Unit tests for the schema drift diff — no database, hand-built MetaData."""
 
+import re
+from pathlib import Path
+
 from sqlalchemy import CHAR, Column, Date, Integer, MetaData, Numeric, String, Table
 
 from pricepilot.db.schema_check import DATAPLANE_WRITTEN_TABLES, diff_schema
+
+TABLE_OWNERSHIP_MD = (
+    Path(__file__).parent.parent.parent / "shared" / "contracts" / "table-ownership.md"
+)
 
 
 def problems_contain(problems: list[str], *needles: str) -> bool:
@@ -72,6 +79,24 @@ def test_nullability_mismatch_is_drift() -> None:
     assert problems_contain(
         diff_schema(declared, reflected), "events.start_date", "nullable"
     )
+
+
+def test_written_tables_match_the_ownership_contract() -> None:
+    """DATAPLANE_WRITTEN_TABLES must mirror table-ownership.md.
+
+    If a new dataplane-written table lands in the contract but not the frozenset,
+    the full-mapping rule silently degrades to the lax backend-table rule for it —
+    exactly the unmapped-NOT-NULL-column class this check exists to prevent.
+    """
+    contract = TABLE_OWNERSHIP_MD.read_text(encoding="utf-8")
+    written_by_dataplane = set()
+    for line in contract.splitlines():
+        row = re.match(r"^\| `(\w+)` \| ([^|]+) \|", line)
+        if row:
+            writer = row.group(2).strip().strip("*")
+            if writer in ("dataplane", "both"):
+                written_by_dataplane.add(row.group(1))
+    assert written_by_dataplane == set(DATAPLANE_WRITTEN_TABLES)
 
 
 def test_unmapped_db_column_is_drift_only_for_dataplane_written_tables() -> None:

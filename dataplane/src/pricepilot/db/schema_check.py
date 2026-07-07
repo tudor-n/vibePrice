@@ -38,6 +38,9 @@ _DIALECT = postgresql.dialect()
 
 
 def _type_str(col_type: TypeEngine) -> str:
+    # No alias table / whitespace normalization on purpose: both sides compile
+    # through the same dialect, so identical types always yield identical
+    # strings — a spelling mismatch can only fail loudly, never pass silently.
     return col_type.compile(dialect=_DIALECT).upper().strip()
 
 
