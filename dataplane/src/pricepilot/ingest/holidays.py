@@ -7,7 +7,22 @@ year works and legal changes are tracked upstream; persist into
 ``demand_signals`` (source="holidays").
 """
 
-from datetime import date
+import logging
+from datetime import date, timedelta
+from decimal import Decimal
+
+from sqlalchemy.orm import Session
+
+from pricepilot.ingest.demand_signals import DemandSignalRecord, upsert_demand_signals
+
+logger = logging.getLogger(__name__)
+
+HOLIDAY_SIGNAL_TYPE = "public_holiday"
+HOLIDAYS_SOURCE = "holidays"
+_HOLIDAY_VALUE = Decimal("1")  # presence flag (numeric(14,4))
+
+#: Days ahead we guarantee holiday coverage for (>= engine horizon of 90).
+HOLIDAY_HORIZON_DAYS = 400
 
 _HOLIDAYS_2026: list[date] = [
     date(2026, 1, 1),  # New Year's Day
@@ -36,3 +51,47 @@ def romanian_public_holidays(year: int) -> list[date]:
             f"Only 2026 is hardcoded; use the `holidays` package for year {year} (TODO)."
         )
     return list(_HOLIDAYS_2026)
+
+
+def holiday_signal_records(city: str, year: int) -> list[DemandSignalRecord]:
+    """Public holidays of ``year`` as city-scoped demand-signal flags.
+
+    Raises ``NotImplementedError`` for a year the source cannot supply — callers
+    that span multiple years should use :func:`supported_holiday_records`.
+    """
+    return [
+        DemandSignalRecord(
+            city=city,
+            signal_type=HOLIDAY_SIGNAL_TYPE,
+            signal_date=holiday,
+            value=_HOLIDAY_VALUE,
+        )
+        for holiday in romanian_public_holidays(year)
+    ]
+
+
+def supported_holiday_records(city: str, years: list[int]) -> list[DemandSignalRecord]:
+    """Holiday flags for every supported year in ``years`` (unsupported skipped)."""
+    records: list[DemandSignalRecord] = []
+    for year in years:
+        try:
+            records.extend(holiday_signal_records(city, year))
+        except NotImplementedError:
+            logger.warning("Skipping holidays for unsupported year %d (source TODO)", year)
+    return records
+
+
+def ingest_holidays(session: Session, *, city: str, today: date | None = None) -> int:
+    """Upsert public-holiday flags for ``city`` across the coverage horizon.
+
+    Attempts every calendar year touched by ``[today, today + HOLIDAY_HORIZON_DAYS]``
+    so a 90-day recommendation window that crosses Dec 31 can be covered. Coverage
+    is best-effort: years the source cannot supply are skipped (logged), so until
+    multi-year support lands (the ``holidays`` package TODO) only 2026 is written.
+    Idempotent; does not commit.
+    """
+    today = today or date.today()
+    end = today + timedelta(days=HOLIDAY_HORIZON_DAYS)
+    years = list(range(today.year, end.year + 1))
+    records = supported_holiday_records(city, years)
+    return upsert_demand_signals(session, records, source=HOLIDAYS_SOURCE)

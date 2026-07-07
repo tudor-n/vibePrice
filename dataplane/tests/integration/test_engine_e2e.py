@@ -27,7 +27,7 @@ from dbprobe import DATABASE_URL, integration_marks
 from sqlalchemy import create_engine, func, select, text, update
 from sqlalchemy.orm import Session
 
-from pricepilot.db.tables import Event, Recommendation, ScrapedRate, ScrapeRun
+from pricepilot.db.tables import DemandSignal, Event, Recommendation, ScrapedRate, ScrapeRun
 from pricepilot.demo.seed import COMPETITOR_PROFILES, SEED_DAYS, seed
 from pricepilot.scheduler.jobs import handle_generate_recommendations
 
@@ -149,6 +149,16 @@ def test_demo_seed_is_idempotent(session: Session) -> None:
 
     events = session.execute(select(Event).where(Event.source == "static_sibiu")).scalars().all()
     assert len(events) == 3
+
+    # Public-holiday signals: idempotent uuid5 upsert -> stable count across re-seeds.
+    assert first["demand_signals_written"] == second["demand_signals_written"]
+    holiday_count = session.execute(
+        select(func.count()).where(
+            DemandSignal.city == "sibiu",
+            DemandSignal.signal_type == "public_holiday",
+        )
+    ).scalar()
+    assert holiday_count == second["demand_signals_written"]  # no duplicates
 
 
 def test_generate_recommendations_end_to_end(session: Session) -> None:

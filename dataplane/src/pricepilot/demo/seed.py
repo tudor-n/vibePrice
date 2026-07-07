@@ -43,6 +43,7 @@ from sqlalchemy.orm import Session
 from pricepilot.db.session import session_scope
 from pricepilot.db.tables import Competitor, ScrapedRate, ScrapeRun
 from pricepilot.ingest.events import EventRecord, StaticSibiuEventSource, upsert_events
+from pricepilot.ingest.holidays import ingest_holidays
 
 logger = logging.getLogger(__name__)
 
@@ -190,9 +191,14 @@ def seed(session: Session, *, today: date | None = None) -> dict[str, Any]:
     )
     session.execute(run_stmt)
 
+    # 4. Public-holiday demand signals for sibiu (idempotent uuid5 upsert; the
+    #    same rows the ingest.demand_signals job writes).
+    demand_signals_written = ingest_holidays(session, city="sibiu", today=today)
+
     return {
         "events_written": events_written,
         "scraped_rates_written": len(rate_rows),
+        "demand_signals_written": demand_signals_written,
         "scrape_run_id": str(DEMO_SCRAPE_RUN_ID),
         "first_stay_date": today.isoformat(),
         "last_stay_date": (today + timedelta(days=SEED_DAYS - 1)).isoformat(),
