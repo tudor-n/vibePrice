@@ -17,22 +17,19 @@ inserted by a test fixture below as a stand-in for the backend demo seeder
 fixture — runtime dataplane code never writes backend-owned tables.
 """
 
-import os
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
 import pytest
+from dbprobe import DATABASE_URL, integration_marks
 from sqlalchemy import create_engine, func, select, text, update
 from sqlalchemy.orm import Session
 
 from pricepilot.db.tables import Event, Recommendation, ScrapedRate, ScrapeRun
 from pricepilot.demo.seed import COMPETITOR_PROFILES, SEED_DAYS, seed
 from pricepilot.scheduler.jobs import handle_generate_recommendations
-
-DEFAULT_DATABASE_URL = "postgresql+psycopg://pricepilot:devpassword@localhost:5432/pricepilot"
-DATABASE_URL = os.environ.get("DATABASE_URL", DEFAULT_DATABASE_URL)
 
 # Fixed demo UUIDs — shared/contracts/demo-seed.md.
 TENANT_ID = UUID("11111111-1111-4111-8111-111111111111")
@@ -49,27 +46,7 @@ ENGINE_PAYLOAD: dict[str, Any] = {
 EXPECTED_RULES = ["seasonality", "event_impact", "competitor_position", "day_of_week", "lead_time"]
 
 
-def _db_ready() -> tuple[bool, str]:
-    try:
-        probe = create_engine(DATABASE_URL, connect_args={"connect_timeout": 2})
-        try:
-            with probe.connect() as conn:
-                has_schema = conn.execute(text("SELECT to_regclass('recommendations')")).scalar()
-            if has_schema is None:
-                return False, "schema missing — apply the backend EF migrations"
-            return True, ""
-        finally:
-            probe.dispose()
-    except Exception as exc:  # noqa: BLE001 - any connection failure means skip
-        return False, str(exc)
-
-
-_READY, _SKIP_REASON = _db_ready()
-
-pytestmark = [
-    pytest.mark.integration,
-    pytest.mark.skipif(not _READY, reason=f"integration database unavailable: {_SKIP_REASON}"),
-]
+pytestmark = integration_marks()
 
 # Stand-in for the backend demo seeder (dev DB test fixture only — see module docstring).
 _BACKEND_DEMO_ROWS_SQL = [
