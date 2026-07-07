@@ -152,7 +152,12 @@ class DemandSignal(Base):
 
 
 class Recommendation(Base):
-    """Dataplane INSERTs rows; backend UPDATEs `status` only (pending → accepted/dismissed)."""
+    """Dataplane INSERTs rows; backend UPDATEs `status` only (pending → accepted/dismissed).
+
+    DB enforces at most one PENDING row per (room_type_id, stay_date)
+    (partial unique index) — the engine's delete-then-insert transaction
+    relies on it failing loudly under concurrent workers.
+    """
 
     __tablename__ = "recommendations"
 

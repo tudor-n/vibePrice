@@ -396,6 +396,11 @@ namespace PricePilot.Infrastructure.Migrations
                     b.HasIndex("PropertyId", "StayDate")
                         .HasDatabaseName("ix_recommendations_property_id_stay_date");
 
+                    b.HasIndex("RoomTypeId", "StayDate")
+                        .IsUnique()
+                        .HasDatabaseName("ix_recommendations_room_type_id_stay_date")
+                        .HasFilter("status = 'pending'");
+
                     b.ToTable("recommendations", (string)null);
                 });
 

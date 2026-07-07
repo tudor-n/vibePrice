@@ -23,7 +23,7 @@ EF Core entity + migration, and the SQLAlchemy model.
 | `scrape_runs` | dataplane | one row per scraper execution: source, status, started/finished, error |
 | `events` | dataplane | city-scoped, not tenant-scoped; name, start/end, impact_score 0-100 |
 | `demand_signals` | dataplane | city-scoped public stats time series (INS, weather, holidays) |
-| `recommendations` | **both** | dataplane INSERTs new rows; backend UPDATEs `status` only (pending → accepted/dismissed) |
+| `recommendations` | **both** | dataplane INSERTs new rows; backend UPDATEs `status` only (pending → accepted/dismissed). Partial unique index: at most one **pending** row per (room_type_id, stay_date) — concurrent engine runs fail loudly instead of duplicating |
 | `own_bookings` | dataplane | future ingestion of hotel booking history; unused in v1 |
 | `jobs` | **both** | backend INSERTs (dashboard "refresh now"); dataplane claims rows and UPDATEs `status`/`result` |
 

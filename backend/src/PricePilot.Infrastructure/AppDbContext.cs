@@ -123,6 +123,17 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
         {
             e.HasIndex(x => x.TenantId);
             e.HasIndex(x => new { x.PropertyId, x.StayDate });
+            // At most one PENDING recommendation per room type and stay date. The dataplane
+            // replaces pending rows per (room_type_id, stay_date) in one transaction; with
+            // concurrent workers this turns a race into a loud unique violation instead of
+            // duplicate pending rows. Decided rows are exempt (history may repeat a date).
+            e.HasIndex(x => new { x.RoomTypeId, x.StayDate })
+                .IsUnique()
+                .HasFilter("status = 'pending'");
+            // Keep the plain FK index explicitly: EF would otherwise drop it as "covered"
+            // by the composite above, but a PARTIAL index can't serve room_type_id lookups
+            // on decided rows (e.g. the engine's decided-keys query).
+            e.HasIndex(x => x.RoomTypeId);
             e.Property(x => x.CurrentPrice).HasPrecision(10, 2);
             e.Property(x => x.RecommendedPrice).HasPrecision(10, 2);
             e.Property(x => x.ExpectedImpact).HasPrecision(10, 2);
