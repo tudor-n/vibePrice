@@ -8,16 +8,21 @@ year works and legal changes are tracked upstream; persist into
 """
 
 import logging
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
-from pricepilot.ingest.demand_signals import DemandSignalRecord
+from sqlalchemy.orm import Session
+
+from pricepilot.ingest.demand_signals import DemandSignalRecord, upsert_demand_signals
 
 logger = logging.getLogger(__name__)
 
 HOLIDAY_SIGNAL_TYPE = "public_holiday"
 HOLIDAYS_SOURCE = "holidays"
 _HOLIDAY_VALUE = Decimal("1")  # presence flag (numeric(14,4))
+
+#: Days ahead we guarantee holiday coverage for (>= engine horizon of 90).
+HOLIDAY_HORIZON_DAYS = 400
 
 _HOLIDAYS_2026: list[date] = [
     date(2026, 1, 1),  # New Year's Day
@@ -74,3 +79,17 @@ def supported_holiday_records(city: str, years: list[int]) -> list[DemandSignalR
         except NotImplementedError:
             logger.warning("Skipping holidays for unsupported year %d (source TODO)", year)
     return records
+
+
+def ingest_holidays(session: Session, *, city: str, today: date | None = None) -> int:
+    """Upsert public-holiday flags for ``city`` across the coverage horizon.
+
+    Covers every calendar year touched by ``[today, today + HOLIDAY_HORIZON_DAYS]``
+    so a 90-day recommendation window that crosses Dec 31 still has coverage.
+    Unsupported years are skipped (logged). Idempotent; does not commit.
+    """
+    today = today or date.today()
+    end = today + timedelta(days=HOLIDAY_HORIZON_DAYS)
+    years = list(range(today.year, end.year + 1))
+    records = supported_holiday_records(city, years)
+    return upsert_demand_signals(session, records, source=HOLIDAYS_SOURCE)
