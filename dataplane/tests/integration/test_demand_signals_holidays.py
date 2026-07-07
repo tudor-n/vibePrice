@@ -71,3 +71,25 @@ def test_ingest_holidays_is_idempotent() -> None:
         assert row.source == "holidays"
     finally:
         session.close()
+
+
+def test_handler_writes_holiday_signals() -> None:
+    session = _session()
+    try:
+        session.execute(
+            delete(DemandSignal).where(
+                DemandSignal.city == _TEST_CITY,
+                DemandSignal.signal_type == HOLIDAY_SIGNAL_TYPE,
+            )
+        )
+        session.commit()
+
+        from pricepilot.scheduler.jobs import handle_ingest_demand_signals
+
+        result = handle_ingest_demand_signals(session, {"city": "SIBIU"})  # case-normalized
+        session.commit()
+
+        assert result["city"] == "sibiu"
+        assert result["signals_written"] >= len(romanian_public_holidays(2026))
+    finally:
+        session.close()

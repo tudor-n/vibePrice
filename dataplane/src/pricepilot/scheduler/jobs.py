@@ -31,6 +31,7 @@ from pricepilot.engine.models import RuleContext
 from pricepilot.engine.pipeline import compute
 from pricepilot.engine.serialization import to_jsonable
 from pricepilot.ingest.events import EventRecord, StaticSibiuEventSource, upsert_events
+from pricepilot.ingest.holidays import ingest_holidays
 
 logger = logging.getLogger(__name__)
 
@@ -125,11 +126,16 @@ def handle_ingest_events(session: Session, payload: dict[str, Any]) -> dict[str,
 
 
 def handle_ingest_demand_signals(session: Session, payload: dict[str, Any]) -> dict[str, Any]:
-    """Refresh public stats/holidays/weather signals for a city."""
-    logger.info("ingest.demand_signals stub: payload=%s", payload)
-    # TODO: run ingest.holidays / ingest.tourism_stats / ingest.weather and
-    # upsert into demand_signals.
-    return {"note": "stub — no signals ingested", "signals_written": 0}
+    """Refresh public demand signals for a city.
+
+    v1 source: Romanian public holidays as ``public_holiday`` flags in
+    ``demand_signals`` (idempotent uuid5 upsert). Tourism stats / weather
+    remain TODO (``ingest.tourism_stats`` / ``ingest.weather`` — external APIs).
+    """
+    city = (payload.get("city") or "sibiu").lower()
+    written = ingest_holidays(session, city=city)
+    logger.info("ingest.demand_signals: city=%s signals_written=%d", city, written)
+    return {"city": city, "signals_written": written}
 
 
 @dataclass(frozen=True)
