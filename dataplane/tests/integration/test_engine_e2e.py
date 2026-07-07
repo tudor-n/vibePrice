@@ -127,15 +127,19 @@ def _pending_keys(session: Session) -> list[tuple[UUID, date]]:
 
 
 def test_demo_seed_is_idempotent(session: Session) -> None:
-    first = seed(session)
+    today = date.today()
+    first = seed(session, today=today)
     session.commit()
-    second = seed(session)
+    second = seed(session, today=today)
     session.commit()
     assert first["scraped_rates_written"] == second["scraped_rates_written"] == 3 * SEED_DAYS
 
     competitor_ids = [p.competitor_id for p in COMPETITOR_PROFILES]
     rate_count = session.execute(
-        select(func.count()).where(ScrapedRate.competitor_id.in_(competitor_ids))
+        select(func.count()).where(
+            ScrapedRate.competitor_id.in_(competitor_ids),
+            ScrapedRate.stay_date >= today,  # stale dev volumes hold past-dated rows
+        )
     ).scalar()
     assert rate_count == 3 * SEED_DAYS  # upsert on deterministic ids: no duplicates
 
