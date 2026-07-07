@@ -64,6 +64,25 @@ Verified: dataplane 86/86 passed (first fully green DB-backed run) + ruff clean;
 backend 37/37, build 0 warnings; both migrations applied to the dev DB; workflow
 linted with actionlint.
 
+## Wave 2.3 (first demand signal) — landed 2026-07-07
+
+Plan: `superpowers/plans/2026-07-07-demand-signals-holidays-ingestion.md`.
+
+- [x] **`demand_signals` producer**: Romanian public holidays → `demand_signals`
+  as `public_holiday` flags (`value=Decimal("1")`, `source="holidays"`), city-scoped.
+  New `ingest/demand_signals.py` (deterministic uuid5 record + `ON CONFLICT (id) DO
+  UPDATE` upsert, mirroring `ingest.events`); `ingest/holidays.py` gains the
+  record mapping + `ingest_holidays` orchestration (covers the years the ~90-day
+  horizon touches, skips unsupported years gracefully). The `ingest.demand_signals`
+  job handler is wired (no longer a stub) and the demo seeder emits holiday signals.
+- [x] **Write path only** — no schema/contract change (`demand_signals` shape
+  unchanged, no EF migration); engine *consumption* of holidays is a deliberate
+  follow-up (no rule reads holidays yet, so prices are unchanged for now).
+
+Verified: dataplane 94/94 passed (full suite incl. integration) + ruff clean;
+`ingest.demand_signals` job dispatched end-to-end via `poll_once` → `succeeded`,
+`{"city":"sibiu","signals_written":16}`; schema-sync still green; backend untouched.
+
 ## Backlog (ordered roughly by value)
 
 - [x] End-to-end demo doc: `docs/demo.md` (compose/local, seed, engine run, login)
@@ -72,6 +91,9 @@ linted with actionlint.
 - [x] `test_demo_seed_is_idempotent` robust to stale dev volumes — wave 2.2
 - [ ] Real Booking.com scraper (live fetch + anti-bot handling; parser pattern exists) — needs human-in-the-loop iteration
 - [ ] Airbnb scraper
+- [x] Public-holiday `demand_signals` ingestion (`ingest/holidays.py` → `demand_signals`) — wave 2.3 (write path; engine consumption still a follow-up)
+- [ ] Engine consumption of holidays (a holiday/holiday-weekend rule or demand factor) — what actually moves prices
+- [ ] `holidays` PyPI package so any year works (replace the hardcoded 2026 list)
 - [ ] INS Tempo tourism statistics ingestion (`ingest/tourism_stats.py`)
 - [ ] Weather ingestion via open-meteo (`ingest/weather.py`)
 - [ ] Events calendar scraping (replace StaticSibiuEventSource)

@@ -84,9 +84,11 @@ def supported_holiday_records(city: str, years: list[int]) -> list[DemandSignalR
 def ingest_holidays(session: Session, *, city: str, today: date | None = None) -> int:
     """Upsert public-holiday flags for ``city`` across the coverage horizon.
 
-    Covers every calendar year touched by ``[today, today + HOLIDAY_HORIZON_DAYS]``
-    so a 90-day recommendation window that crosses Dec 31 still has coverage.
-    Unsupported years are skipped (logged). Idempotent; does not commit.
+    Attempts every calendar year touched by ``[today, today + HOLIDAY_HORIZON_DAYS]``
+    so a 90-day recommendation window that crosses Dec 31 can be covered. Coverage
+    is best-effort: years the source cannot supply are skipped (logged), so until
+    multi-year support lands (the ``holidays`` package TODO) only 2026 is written.
+    Idempotent; does not commit.
     """
     today = today or date.today()
     end = today + timedelta(days=HOLIDAY_HORIZON_DAYS)

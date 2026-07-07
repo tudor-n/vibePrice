@@ -13,7 +13,8 @@ backend only through PostgreSQL and the `jobs` table (`shared/contracts/`).
 | `src/pricepilot/db/tables.py` | SQLAlchemy mappings of the backend-owned schema |
 | `src/pricepilot/db/schema_check.py` | drift diff: mappings vs reflected DB schema (CI-enforced) |
 | `src/pricepilot/scrapers/` | per-OTA scraper modules + `SCRAPERS` registry |
-| `src/pricepilot/ingest/` | events, holidays, INS tourism stats, weather |
+| `src/pricepilot/ingest/` | events (real), holidays → demand_signals (real); INS tourism stats + weather still TODO stubs |
+| `src/pricepilot/ingest/demand_signals.py` | `demand_signals` record + uuid5 idempotent upsert (city-scoped, not tenant-scoped); holidays wired, tourism/weather TODO |
 | `src/pricepilot/engine/rules/` | pure pricing rules, ordered in `RULES` |
 | `src/pricepilot/engine/pipeline.py` | combines rule adjustments into a price |
 | `src/pricepilot/engine/explainer.py` | builds the `factors` JSON (contract shape) |
