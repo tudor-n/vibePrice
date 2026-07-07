@@ -32,6 +32,49 @@ jobs:
       - run: ruff check src tests
       - run: python -m pytest
 
+  # Postgres-backed run: applies backend EF migrations (schema owner), then runs
+  # the whole dataplane suite — schema-sync drift check included — with skips
+  # forbidden (PRICEPILOT_REQUIRE_DB=1). The plain `dataplane` job stays as the
+  # fast DB-less run.
+  dataplane-integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: pricepilot
+          POSTGRES_USER: pricepilot
+          POSTGRES_PASSWORD: devpassword
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U pricepilot -d pricepilot"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+      - name: Apply EF migrations (backend owns the schema)
+        working-directory: backend
+        run: |
+          dotnet tool restore
+          dotnet tool run dotnet-ef database update \
+            --project src/PricePilot.Infrastructure --startup-project src/PricePilot.Api \
+            --connection "Host=localhost;Port=5432;Database=pricepilot;Username=pricepilot;Password=devpassword"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run dataplane suite against the migrated database
+        working-directory: dataplane
+        env:
+          DATABASE_URL: postgresql+psycopg://pricepilot:devpassword@localhost:5432/pricepilot
+          PRICEPILOT_REQUIRE_DB: "1"
+        run: |
+          pip install -e .[dev]
+          python -m pytest
+
   web:
     runs-on: ubuntu-latest
     defaults:
