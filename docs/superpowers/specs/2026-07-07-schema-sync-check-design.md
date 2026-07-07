@@ -40,10 +40,15 @@ without a database by building two `MetaData` objects by hand (TDD).
 Comparison rules, per table declared in `Base.metadata`:
 
 - Table must exist in the reflected metadata (missing table = drift).
-- Column **sets must be exactly equal** — a column mapped but absent in the DB crashes at
-  runtime (the phantom-column class); a DB column absent from the mapping hides schema
-  the contract says we mirror (the `OwnBooking.source` class). Both directions are drift.
-- Per column: **type** and **nullability** must match. Types compare by compiling both
+- Every **mapped column** must exist in the DB — a column mapped but absent crashes at
+  runtime (the phantom `OwnBooking.created_at` class). Applies to all tables.
+- A DB column **absent from the mapping** is drift only for **dataplane-written tables**
+  (`scraped_rates`, `scrape_runs`, `events`, `demand_signals`, `recommendations`,
+  `own_bookings`, `jobs` — per `table-ownership.md`): there an unmapped NOT NULL column
+  breaks INSERTs (the `OwnBooking.source` class). Backend-only tables are deliberately
+  partially mapped (dataplane reads a subset and never writes them), so missing columns
+  are allowed there.
+- Per mapped column: **type** and **nullability** must match. Types compare by compiling both
   sides against the PostgreSQL dialect (`type.compile(dialect)`) and normalizing the
   strings (upper-case, collapse whitespace), with a small alias table for spellings the
   reflection layer produces (e.g. `TIMESTAMP WITH TIME ZONE`). Length/precision/scale are
@@ -51,8 +56,12 @@ Comparison rules, per table declared in `Base.metadata`:
 
 Deliberately out of scope for v1 (noisy, low bug-yield here): indexes, foreign keys,
 server defaults, check constraints, tables that exist in the DB but are not declared
-(`__EFMigrationsHistory` and anything else — the mapping mirrors what dataplane uses;
-the exact-column rule applies only to *declared* tables).
+(`__EFMigrationsHistory` and anything else — the mapping mirrors what dataplane uses).
+
+Known drift this check will surface on first run (fixing it is in scope): the four
+`currency` columns are `character(3)` in the migration but `String(3)` (= varchar) in
+`tables.py` — change the mappings to `CHAR(3)`. Any further reported drift gets fixed
+in `tables.py` the same way (the database is ground truth).
 
 ### 2. Integration test: `dataplane/tests/integration/test_schema_sync.py`
 
