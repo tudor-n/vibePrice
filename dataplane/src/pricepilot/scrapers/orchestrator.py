@@ -1,0 +1,199 @@
+"""Scrape orchestration: compose client + scraper + matcher, persist results.
+
+Collection (:func:`collect_source_observations`) is side-effect-free apart
+from the injected client, so unit tests drive it with fakes and fixtures.
+Persistence (:func:`scrape_city`) owns the ``scrape_runs`` bookkeeping and the
+append-only ``scraped_rates`` inserts (history is intentional: the engine
+reads latest-per-(competitor, stay date); rate evolution is future training
+data).
+
+Run-status semantics (spec 2026-07-08): a run that wrote at least one
+observation finishes ``succeeded`` — per-date issues travel in ``error`` text
+even on success; a run that wrote nothing finishes ``failed``. No competitors
+in scope → no run row at all (an empty run must not fake market freshness).
+"""
+
+import logging
+from collections.abc import Sequence
+from dataclasses import dataclass, field
+from datetime import UTC, date, datetime
+from typing import Any, Protocol
+
+from sqlalchemy import insert, update
+from sqlalchemy.orm import Session
+
+from pricepilot.db.tables import ScrapedRate, ScrapeRun
+from pricepilot.scrapers import SCRAPERS
+from pricepilot.scrapers.base import RateObservation, SearchScraper
+from pricepilot.scrapers.client import ScraperBlockedError, ScraperFetchError
+from pricepilot.scrapers.matching import CompetitorRef, match_listings
+
+logger = logging.getLogger(__name__)
+
+
+class SupportsGet(Protocol):
+    """The one client capability scrapers consume (PoliteClient or a fake)."""
+
+    def get(self, url: str) -> str: ...
+
+
+@dataclass
+class SourceOutcome:
+    """Everything one source's pass over the stay-date window produced."""
+
+    observations: list[RateObservation] = field(default_factory=list)
+    dates_fetched: int = 0
+    dates_failed: int = 0
+    issues: list[str] = field(default_factory=list)
+    blocked: bool = False
+    unmatched: list[str] = field(default_factory=list)
+
+
+def collect_source_observations(
+    scraper: SearchScraper,
+    client: SupportsGet,
+    *,
+    city: str,
+    competitors: Sequence[CompetitorRef],
+    stay_dates: Sequence[date],
+    expected_currency: str,
+) -> SourceOutcome:
+    """Fetch/parse/match the whole window for one source. No DB access.
+
+    A block aborts the remaining dates (hammering a refusing site is both
+    impolite and useless); transient failures skip only their date. Matched
+    observations in a different currency than requested are dropped with an
+    issue note — money in the wrong currency must never reach the engine.
+    """
+    outcome = SourceOutcome()
+    matched_ever: set[Any] = set()
+
+    for index, stay_date in enumerate(stay_dates):
+        plan = scraper.plan_request(city, stay_date)
+        try:
+            html = client.get(plan.url)
+        except ScraperBlockedError as exc:
+            remaining = len(stay_dates) - index
+            outcome.blocked = True
+            outcome.dates_failed += remaining
+            outcome.issues.append(
+                f"{stay_date}: blocked ({exc}); aborted the remaining {remaining - 1} dates"
+            )
+            break
+        except ScraperFetchError as exc:
+            outcome.dates_failed += 1
+            outcome.issues.append(f"{stay_date}: {exc}")
+            continue
+
+        outcome.dates_fetched += 1
+        listings = scraper.parse_listings(html)
+        for competitor_id, listing in match_listings(listings, competitors, city).items():
+            # Name matching succeeded either way; currency decides persistence.
+            matched_ever.add(competitor_id)
+            if listing.currency != expected_currency:
+                outcome.issues.append(
+                    f"{stay_date}: currency mismatch {listing.currency} for "
+                    f"{listing.name!r}; observation dropped"
+                )
+                continue
+            outcome.observations.append(
+                RateObservation(
+                    competitor_id=competitor_id,
+                    stay_date=stay_date,
+                    price=listing.price,
+                    currency=listing.currency,
+                )
+            )
+
+    if outcome.dates_fetched:
+        outcome.unmatched = [
+            competitor.name
+            for competitor in competitors
+            if competitor.id not in matched_ever
+        ]
+    return outcome
+
+
+def scrape_city(
+    session: Session,
+    client: SupportsGet,
+    *,
+    city: str,
+    competitors: Sequence[CompetitorRef],
+    stay_dates: Sequence[date],
+    sources: Sequence[str],
+    currency: str,
+) -> dict[str, Any]:
+    """Run every enabled source for one city; persist rates + run bookkeeping."""
+    source_reports: dict[str, Any] = {}
+    total_written = 0
+
+    for source_name in sources:
+        scraper_cls = SCRAPERS.get(source_name)
+        if scraper_cls is None:
+            source_reports[source_name] = {"skipped": "unknown source"}
+            logger.warning("scrape: unknown source %r requested", source_name)
+            continue
+        scraper = scraper_cls(currency=currency)
+        if not scraper.implemented:
+            source_reports[source_name] = {"skipped": "not implemented"}
+            continue
+
+        run = ScrapeRun(source=source_name, status="running")
+        session.add(run)
+        session.commit()  # the running row is observable while we work
+
+        outcome = collect_source_observations(
+            scraper,
+            client,
+            city=city,
+            competitors=competitors,
+            stay_dates=stay_dates,
+            expected_currency=currency,
+        )
+
+        if outcome.observations:
+            session.execute(
+                insert(ScrapedRate),
+                [
+                    {
+                        "competitor_id": observation.competitor_id,
+                        "stay_date": observation.stay_date,
+                        "price": observation.price,
+                        "currency": observation.currency,
+                    }
+                    for observation in outcome.observations
+                ],
+            )
+
+        issues = list(outcome.issues)
+        if outcome.unmatched:
+            issues.append("unmatched competitors: " + ", ".join(sorted(outcome.unmatched)))
+        error_text = "; ".join(issues) or None
+        status = "succeeded" if outcome.observations else "failed"
+        session.execute(
+            update(ScrapeRun)
+            .where(ScrapeRun.id == run.id)
+            .values(status=status, finished_at=datetime.now(UTC), error=error_text)
+        )
+        session.commit()
+
+        written = len(outcome.observations)
+        total_written += written
+        source_reports[source_name] = {
+            "rates_written": written,
+            "dates_fetched": outcome.dates_fetched,
+            "dates_failed": outcome.dates_failed,
+            "unmatched": sorted(outcome.unmatched),
+            "error": error_text,
+        }
+        logger.info(
+            "scrape %s/%s: %d rates over %d dates (%d failed dates)",
+            city,
+            source_name,
+            written,
+            outcome.dates_fetched,
+            outcome.dates_failed,
+        )
+
+    return {"rates_written": total_written, "sources": source_reports}

@@ -16,6 +16,7 @@ from uuid import UUID
 from sqlalchemy import delete, func, insert, select, text, update
 from sqlalchemy.orm import Session
 
+from pricepilot.config import get_settings
 from pricepilot.db.tables import (
     Competitor,
     Event,
@@ -31,6 +32,9 @@ from pricepilot.engine.models import RuleContext
 from pricepilot.engine.pipeline import compute
 from pricepilot.engine.serialization import to_jsonable
 from pricepilot.ingest.events import EventRecord, StaticSibiuEventSource, upsert_events
+from pricepilot.scrapers.client import PoliteClient
+from pricepilot.scrapers.matching import CompetitorRef
+from pricepilot.scrapers.orchestrator import SupportsGet, scrape_city
 
 logger = logging.getLogger(__name__)
 
@@ -102,13 +106,84 @@ def enqueue_job(session: Session, job_type: str, payload: dict[str, Any]) -> Non
 # --------------------------------------------------------------------------
 
 
-def handle_scrape_competitor_rates(session: Session, payload: dict[str, Any]) -> dict[str, Any]:
-    """Scrape OTA rates for competitors of one property (or a whole city)."""
-    logger.info("scrape.competitor_rates stub: payload=%s", payload)
-    # TODO: look up competitors (by property_id or city), dispatch to
-    # pricepilot.scrapers.SCRAPERS by source, record a scrape_runs row,
-    # and upsert scraped_rates. Idempotent: re-scraping just refreshes rows.
-    return {"note": "stub — no scraping performed", "rates_written": 0}
+def handle_scrape_competitor_rates(
+    session: Session,
+    payload: dict[str, Any],
+    *,
+    client: SupportsGet | None = None,
+) -> dict[str, Any]:
+    """Scrape OTA rates for competitors of one property, a city, or everything.
+
+    Scope resolution (contract ``jobs.md`` — nulls mean "all"): a
+    ``property_id`` wins over ``city`` (its own city is used); a bare ``city``
+    covers every property there; neither → all properties grouped by city.
+    This is the system dispatch path, not a user-facing query; results land in
+    ``scraped_rates``/``scrape_runs`` which are market data, not tenant data.
+
+    Idempotency: observations are append-only history — a re-run appends a
+    fresh capture set and the engine reads latest-per-(competitor, stay date).
+    Raises (→ job ``failed``) only when every attempted source wrote nothing.
+    ``client`` is injectable for tests; production builds a PoliteClient.
+    """
+    settings = get_settings()
+    property_id = _parse_uuid(payload.get("property_id"))
+    payload_city = (payload.get("city") or "").strip().lower() or None
+    today = date.today()
+    stay_dates = [today + timedelta(days=offset) for offset in range(settings.scrape_days_ahead)]
+    sources = settings.scrape_source_list()
+    currency = settings.scrape_currency
+    logger.info("scrape.competitor_rates: payload=%s sources=%s", payload, sources)
+
+    competitor_query = select(Competitor.id, Competitor.name, Property.city).join(
+        Property, Competitor.property_id == Property.id
+    )
+    if property_id is not None:
+        competitor_query = competitor_query.where(Competitor.property_id == property_id)
+    elif payload_city is not None:
+        competitor_query = competitor_query.where(func.lower(Property.city) == payload_city)
+
+    competitors_by_city: dict[str, list[CompetitorRef]] = {}
+    for competitor_id, name, city in session.execute(competitor_query):
+        competitors_by_city.setdefault(city, []).append(
+            CompetitorRef(id=competitor_id, name=name)
+        )
+    if not competitors_by_city:
+        return {"rates_written": 0, "note": "no competitors configured for this scope"}
+
+    owns_client = client is None
+    active_client: SupportsGet = client if client is not None else PoliteClient()
+    try:
+        cities: dict[str, Any] = {}
+        total_written = 0
+        for city in sorted(competitors_by_city):
+            city_result = scrape_city(
+                session,
+                active_client,
+                city=city,
+                competitors=competitors_by_city[city],
+                stay_dates=stay_dates,
+                sources=sources,
+                currency=currency,
+            )
+            cities[city] = city_result
+            total_written += city_result["rates_written"]
+    finally:
+        if owns_client:
+            active_client.close()  # type: ignore[attr-defined]
+
+    attempted = [
+        (city, source_name, report)
+        for city, city_result in cities.items()
+        for source_name, report in city_result["sources"].items()
+        if "skipped" not in report
+    ]
+    if attempted and total_written == 0:
+        summary = "; ".join(
+            f"{city}/{source_name}: {report['error'] or 'no rates written'}"
+            for city, source_name, report in attempted
+        )
+        raise RuntimeError(f"scrape wrote no rates — {summary}")
+    return {"rates_written": total_written, "cities": cities}
 
 
 def handle_ingest_events(session: Session, payload: dict[str, Any]) -> dict[str, Any]:
