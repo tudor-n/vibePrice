@@ -41,6 +41,11 @@ services:
       SCRAPER_USER_AGENT: ${SCRAPER_USER_AGENT:-Mozilla/5.0 (compatible; PricePilotBot/0.1)}
       SCRAPER_PROXY_URL: ${SCRAPER_PROXY_URL:-}
       SCHEDULER_ENABLED: ${SCHEDULER_ENABLED:-true}
+      SCRAPE_SOURCES: ${SCRAPE_SOURCES:-booking}
+      SCRAPE_DAYS_AHEAD: ${SCRAPE_DAYS_AHEAD:-90}
+      SCRAPE_DELAY_SECONDS: ${SCRAPE_DELAY_SECONDS:-4.0}
+      SCRAPE_TIMEOUT_SECONDS: ${SCRAPE_TIMEOUT_SECONDS:-20.0}
+      SCRAPE_CURRENCY: ${SCRAPE_CURRENCY:-RON}
     depends_on:
       db:
         condition: service_healthy
