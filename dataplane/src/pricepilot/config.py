@@ -26,6 +26,12 @@ class Settings(BaseSettings):
     scrape_timeout_seconds: float = 20.0
     scrape_currency: str = "RON"
 
+    # Places (Google Places API): property/competitor geocoding + auto-discovery.
+    places_provider: str = "fixture"        # "google" | "fixture"
+    google_places_api_key: str = ""
+    competitor_discovery_radius_m: int = 1500
+    competitor_discovery_max: int = 15
+
     def scrape_source_list(self) -> list[str]:
         """Enabled scraper names, parsed from the comma-separated env value."""
         return [name.strip() for name in self.scrape_sources.split(",") if name.strip()]
