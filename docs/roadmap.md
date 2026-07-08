@@ -111,6 +111,68 @@ site needs human-in-the-loop iteration (anti-bot). Loop:
 `python -m pricepilot.scrapers.capture booking --city sibiu` → inspect/trim → fix
 selectors → `python -m pricepilot.scrapers.run --city sibiu --days 7` → `--write`.
 
+## Google Places foundation — landed 2026-07-09
+
+Spec: `superpowers/specs/2026-07-08-google-places-foundation-design.md`. First of
+four subsystems decomposed from the owner's "tie locations to Google reviews +
+proximity" vision — the data foundation the later pricing rules build on.
+
+- [x] **Schema**: `properties`/`competitors` gain seven place columns each
+  (`place_id`, `latitude`, `longitude` `numeric(9,6)`, `rating` `numeric(2,1)`,
+  `rating_count`, `place_resolved_at`, `place_candidates jsonb`) plus
+  `discovered_at`/`discovery_source`/`excluded_at` on `competitors`
+  (`source_url` now nullable); new city-scoped `points_of_interest` table (not
+  tenant-scoped, like `events`). EF migration + SQLAlchemy mapping +
+  `table-ownership.md` in the same commit; `tests/test_tables.py` /
+  `test_schema_sync.py` pin it.
+- [x] **Provider seam (dataplane)**: `pricepilot/places/` — `PlacesProvider`
+  protocol (`text_search`/`details`/`nearby`), `GoogleAdapter` (live, keyed by
+  `GOOGLE_PLACES_API_KEY`, never called in tests) and `FixtureAdapter`
+  (replays `tests/fixtures/places/*.json`); provider chosen by
+  `PLACES_PROVIDER` (default `fixture` — no live call without opt-in);
+  coordinates/ratings parsed straight to `Decimal` at the adapter boundary;
+  human-in-the-loop `capture` CLI mirrors the scraper one.
+- [x] **Jobs**: `resolve_place {property_id}` (text-search, auto-pick top
+  match, write place fields + top-5 `place_candidates`, chain-enqueue
+  `discover_competitors`; unresolved+`__failed__` sentinel on no result) and
+  `discover_competitors {property_id}` (`nearby` lodging search, `uuid5`
+  idempotent upsert, excludes the property's own place and tombstoned rows,
+  capped at `COMPETITOR_DISCOVERY_MAX` with dropped-overflow logging). Both
+  contract-first in `jobs.md`, both idempotent.
+- [x] **Backend endpoints**: `POST /properties {name, city}` (enqueues
+  `resolve_place`, no more manual competitor create), `PATCH
+  /properties/{id}/place` (owner picks a stashed candidate; 400 on unknown
+  `place_id`), `POST /properties/{id}/resolve-place` (re-search), `GET
+  /properties/{id}/competitors` (discovered list, excludes tombstoned),
+  `DELETE /competitors/{id}` (soft-delete → `excludedAt`, no hard delete),
+  `GET /points-of-interest?city=`. Every lookup tenant-filtered; foreign ids →
+  404 not 403. `openapi.yaml` + new `place-candidates.md` contract note.
+- [x] **Web UX**: Settings "Add your property" (name + city only) → resolving
+  → resolved (address, ★rating, review count, map-pin chip) → failed-with-retry
+  states; "Not the right place?" candidate picker + free-text re-search;
+  Competitors page is now a read-only discovered list (rating, review count,
+  distance) with per-row Untrack + confirm — no add form.
+- [x] **POI seed**: idempotent deterministic-id seed for Sibiu (Piața Mare
+  w100, Piața Mică w90, Podul Minciunilor w70, Muzeul Brukenthal w80, Centru
+  istoric/old-town centroid w100) on backend startup; read-only endpoint above.
+- [x] **Demo**: `docs/demo.md` "Google Places foundation" walkthrough (enter
+  property → resolve → auto-discover competitors → untrack → POI read) using
+  `PLACES_PROVIDER=fixture` (deterministic, free); real demo path documented
+  (`capture` CLI + `PLACES_PROVIDER=google`).
+- [x] Verified: backend 66/66 (0 warnings), dataplane 175 passed / 14 skipped
+  (DB-only integration, incl. `test_place_jobs.py`, `test_places_provider.py`)
+  + ruff clean, web 97/97 + typecheck + build — 2026-07-09. Dev-DB migration
+  apply, dataplane integration/schema-sync against the migrated DB, and the
+  manual API smoke are human-in-the-loop steps (agents are permission-blocked
+  from dev-DB writes) — see the pre-merge checklist in the task-10 report.
+
+**Still deferred** (explicitly out of scope for this slice, per the design's
+non-goals): the **reviews pricing rule** (own vs. competitor reputation →
+`adjustment_pct`), the **proximity pricing rule** (property ↔ weighted POIs →
+`adjustment_pct`), **self-service account signup**, **live Google adapter
+verification** against a billing-enabled key (human-in-the-loop, like the
+Booking scraper live-verify), and a separate **UX/accessibility overhaul**.
+
 ## Backlog (ordered roughly by value)
 
 - [x] End-to-end demo doc: `docs/demo.md` (compose/local, seed, engine run, login)
