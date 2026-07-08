@@ -145,6 +145,47 @@ public sealed class CompetitorDiscoveryTests : IDisposable
         Assert.Equal(4.2, list!.Single().GetProperty("rating").GetDouble(), 3);
     }
 
+    [Fact]
+    public async Task Competitor_list_returns_latest_capture_per_stay_date()
+    {
+        var client = CreateTenantClient(_tenantA);
+        var (propertyId, competitorId) = SeedDiscoveredCompetitor(_tenantA);
+
+        var stay = DateOnly.FromDateTime(DateTime.UtcNow.Date).AddDays(30);
+        var now = DateTimeOffset.UtcNow;
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            // Three captures for the SAME (competitor, stay_date); the newest must win.
+            // Deliberately inserted out of chronological order to prove ordering isn't insertion order.
+            db.ScrapedRates.AddRange(
+                new ScrapedRate
+                {
+                    Id = Guid.NewGuid(), CompetitorId = competitorId, StayDate = stay,
+                    Price = 210.00m, Currency = "RON", CapturedAt = now.AddHours(-6),
+                },
+                new ScrapedRate
+                {
+                    Id = Guid.NewGuid(), CompetitorId = competitorId, StayDate = stay,
+                    Price = 275.00m, Currency = "RON", CapturedAt = now, // latest
+                },
+                new ScrapedRate
+                {
+                    Id = Guid.NewGuid(), CompetitorId = competitorId, StayDate = stay,
+                    Price = 240.00m, Currency = "RON", CapturedAt = now.AddHours(-24),
+                });
+            db.SaveChanges();
+        }
+
+        var list = await client.GetFromJsonAsync<List<JsonElement>>(
+            $"/api/v1/properties/{propertyId}/competitors");
+        var rates = list!.Single().GetProperty("latestRates").EnumerateArray().ToList();
+        var rate = Assert.Single(rates); // one row per (competitor, stay_date)
+        Assert.Equal(stay.ToString("yyyy-MM-dd"), rate.GetProperty("stayDate").GetString());
+        Assert.Equal(275.00, rate.GetProperty("price").GetDouble(), 2);
+    }
+
     public void Dispose()
     {
         _factory.Dispose();

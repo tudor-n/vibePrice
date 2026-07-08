@@ -7,9 +7,6 @@ namespace PricePilot.Infrastructure.Services;
 
 public sealed class PropertyService(AppDbContext db, ITenantContext tenantContext) : IPropertyService
 {
-    /// <summary>Latest scraped rates returned per competitor; scaffold-level freshness window.</summary>
-    private const int MaxRatesPerCompetitor = 90;
-
     public async Task<IReadOnlyList<PropertyDto>> ListAsync(CancellationToken ct)
     {
         var properties = await db.Properties
@@ -69,17 +66,22 @@ public sealed class PropertyService(AppDbContext db, ITenantContext tenantContex
             .ToListAsync(ct);
 
         var competitorIds = competitors.Select(c => c.Id).ToList();
-        // Sorted client-side (LINQ to Objects): SQLite's provider (unit tests) cannot translate
-        // ORDER BY over DateTimeOffset columns; Postgres (production) has no such restriction.
-        var rates = (await db.ScrapedRates
-            .AsNoTracking()
-            .Where(r => competitorIds.Contains(r.CompetitorId))
-            .ToListAsync(ct))
-            .OrderByDescending(r => r.CapturedAt)
-            .Take(MaxRatesPerCompetitor * Math.Max(competitorIds.Count, 1))
-            .ToList();
 
-        // Latest capture per (competitor, stay date), resolved in memory over the recent window.
+        // Bound the DB fetch to stay dates from today forward. Competitor rates are only shown for
+        // upcoming stays, so this pushes a `WHERE stay_date >= @today` predicate to the DB and caps
+        // the materialized set at the booking horizon (~a year of dates) rather than total scrape
+        // history — the scraper appends continuously, so an unbounded fetch would grow without limit.
+        // We deliberately do NOT filter on captured_at: the latest capture for an in-scope stay_date
+        // may be old (a date the scraper stopped tracking), and dropping it would lose that rate.
+        // stay_date is a `date` (DateOnly) — comparable/orderable on both Postgres and SQLite; the
+        // SQLite test provider cannot translate ORDER BY over captured_at (DateTimeOffset), which is
+        // why the "latest per (competitor, stay_date)" pick is resolved in memory over this bounded set.
+        var horizonStart = DateOnly.FromDateTime(DateTime.UtcNow.Date);
+        var rates = await db.ScrapedRates
+            .AsNoTracking()
+            .Where(r => competitorIds.Contains(r.CompetitorId) && r.StayDate >= horizonStart)
+            .ToListAsync(ct);
+
         var latestByCompetitor = rates
             .GroupBy(r => (r.CompetitorId, r.StayDate))
             .Select(g => g.OrderByDescending(r => r.CapturedAt).First())
