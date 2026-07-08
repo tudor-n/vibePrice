@@ -30,6 +30,11 @@ def _slug(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "_", text.lower()).strip("_")
 
 
+def _redact_key(url: str) -> str:
+    """Mask the `key` query param so the real API key never hits stdout/logs."""
+    return re.sub(r"([?&]key=)[^&]*", r"\1REDACTED", url)
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m pricepilot.places.capture",
@@ -83,7 +88,7 @@ def main(argv: list[str] | None = None) -> int:
         url = f"{_DETAILS}?{urlencode(params)}"
         out_path = Path(args.out or _OUT_DIR / f"details_{_slug(args.place_id)}.json")
 
-    print(f"Fetching {url}")
+    print(f"Fetching {_redact_key(url)}")
     with urlopen(url, timeout=20.0) as resp:  # noqa: S310 - human-in-the-loop CLI, real key
         raw = resp.read().decode("utf-8")
 

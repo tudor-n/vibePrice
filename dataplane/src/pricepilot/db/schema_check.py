@@ -31,6 +31,7 @@ DATAPLANE_WRITTEN_TABLES = frozenset(
         "recommendations",
         "own_bookings",
         "jobs",
+        "competitors",
     }
 )
 

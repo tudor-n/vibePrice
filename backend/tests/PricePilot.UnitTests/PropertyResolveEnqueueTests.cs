@@ -165,6 +165,39 @@ public sealed class PropertyResolveEnqueueTests : IDisposable
         Assert.Empty(property.GetProperty("placeCandidates").EnumerateArray());
     }
 
+    [Fact]
+    public async Task Get_properties_reports_failed_for_the_quoted_failed_sentinel_from_jsonb()
+    {
+        // Npgsql reads a jsonb column containing the JSON string scalar "__failed__" back into a
+        // C# string as its raw JSON text, i.e. WITH surrounding quotes: "\"__failed__\"". SQLite
+        // (used elsewhere in this fixture) stores the seeded C# string verbatim, without quotes.
+        // Both representations must report placeStatus == "failed" with no exception.
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.Properties.Add(new Property
+            {
+                Id = Guid.NewGuid(),
+                TenantId = _tenantId,
+                Name = "Hotel Nowhere (jsonb)",
+                City = "sibiu",
+                PlaceCandidates = "\"__failed__\"",
+                CreatedAt = DateTimeOffset.UtcNow,
+            });
+            db.SaveChanges();
+        }
+
+        var client = CreateTenantClient();
+        var resp = await client.GetAsync("/api/v1/properties");
+        Assert.True(resp.IsSuccessStatusCode, $"expected 200, got {(int)resp.StatusCode}");
+
+        var list = await resp.Content.ReadFromJsonAsync<List<JsonElement>>();
+        var property = list!.Single();
+
+        Assert.Equal("failed", property.GetProperty("placeStatus").GetString());
+        Assert.Empty(property.GetProperty("placeCandidates").EnumerateArray());
+    }
+
     public void Dispose()
     {
         _factory.Dispose();

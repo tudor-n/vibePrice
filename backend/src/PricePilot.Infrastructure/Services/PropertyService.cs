@@ -138,7 +138,7 @@ public sealed class PropertyService(AppDbContext db, ITenantContext tenantContex
     private static PropertyDto ToDto(Property property, IEnumerable<RoomType> roomTypes)
     {
         var status = property.PlaceResolvedAt is not null ? "resolved"
-            : property.PlaceCandidates is "__failed__" ? "failed"
+            : IsFailedSentinel(property.PlaceCandidates) ? "failed"
             : "unresolved";
         var candidates = DeserializeCandidates(property.PlaceCandidates);
         return new PropertyDto(
@@ -156,8 +156,47 @@ public sealed class PropertyService(AppDbContext db, ITenantContext tenantContex
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
     };
 
-    private static IReadOnlyList<PlaceCandidateDto> DeserializeCandidates(string? json) =>
-        string.IsNullOrWhiteSpace(json) || json == "__failed__"
-            ? []
-            : JsonSerializer.Deserialize<List<PlaceCandidateDto>>(json, CandidateJsonOptions) ?? [];
+    // The dataplane writes the bare Python string "__failed__" into the jsonb
+    // place_candidates column when place resolution fails. Postgres/Npgsql round-trips
+    // jsonb back to C# as the raw JSON text, i.e. the QUOTED scalar `"__failed__"`
+    // (12 chars incl. quotes); SQLite (used in unit tests) stores whatever C# string was
+    // seeded, i.e. the BARE form `__failed__` (invalid JSON on its own). Both must be
+    // recognized as the failure sentinel.
+    private static bool IsFailedSentinel(string? placeCandidates)
+    {
+        if (string.IsNullOrWhiteSpace(placeCandidates))
+        {
+            return false;
+        }
+
+        var trimmed = placeCandidates.Trim();
+        return trimmed == "__failed__" || trimmed == "\"__failed__\"";
+    }
+
+    private static IReadOnlyList<PlaceCandidateDto> DeserializeCandidates(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return [];
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(json);
+            if (document.RootElement.ValueKind != JsonValueKind.Array)
+            {
+                // Covers the failure sentinel (a JSON string scalar) and any other
+                // non-array jsonb content — never a candidate list, so never throw.
+                return [];
+            }
+
+            return JsonSerializer.Deserialize<List<PlaceCandidateDto>>(json, CandidateJsonOptions) ?? [];
+        }
+        catch (JsonException)
+        {
+            // Invalid JSON (e.g. the bare __failed__ sentinel as seeded verbatim in
+            // SQLite tests) is not a candidate list either.
+            return [];
+        }
+    }
 }
