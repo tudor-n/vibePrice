@@ -50,6 +50,9 @@ public sealed class PropertyService(AppDbContext db, ITenantContext tenantContex
         return ToDto(property, []);
     }
 
+    public Task<bool> ExistsAsync(Guid propertyId, CancellationToken ct) =>
+        db.Properties.AsNoTracking().AnyAsync(p => p.Id == propertyId, ct);
+
     public async Task<IReadOnlyList<CompetitorDto>?> ListCompetitorsAsync(Guid propertyId, CancellationToken ct)
     {
         var propertyExists = await db.Properties.AsNoTracking().AnyAsync(p => p.Id == propertyId, ct);

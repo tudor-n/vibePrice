@@ -16,6 +16,7 @@ public static class JobEndpoints
         group.MapPost("/", async (
             JobCreateRequest request,
             IJobDispatcher jobs,
+            IPropertyService properties,
             ClaimsPrincipal user,
             CancellationToken ct) =>
         {
@@ -25,6 +26,23 @@ public static class JobEndpoints
                 {
                     error = $"type must be one of: {string.Join(", ", JobTypes.All)} (see shared/contracts/jobs.md)",
                 });
+            }
+
+            // A property_id in the payload must resolve through the tenant-filtered
+            // context: job payloads must never become a cross-tenant trigger channel.
+            if (request.Payload is { ValueKind: JsonValueKind.Object } payload
+                && payload.TryGetProperty("property_id", out var propertyIdElement)
+                && propertyIdElement.ValueKind != JsonValueKind.Null)
+            {
+                if (propertyIdElement.ValueKind != JsonValueKind.String
+                    || !Guid.TryParse(propertyIdElement.GetString(), out var propertyId))
+                {
+                    return Results.BadRequest(new { error = "payload.property_id must be a UUID" });
+                }
+                if (!await properties.ExistsAsync(propertyId, ct))
+                {
+                    return Results.NotFound(new { error = "property not found" });
+                }
             }
 
             var requestedBy = user.FindFirst(ClaimTypes.NameIdentifier)?.Value is { } sub
