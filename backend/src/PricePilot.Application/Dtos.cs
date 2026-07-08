@@ -43,7 +43,7 @@ public sealed record CompetitorRateDto(
 public sealed record CompetitorDto(
     Guid Id,
     string Name,
-    string SourceUrl,
+    string? SourceUrl,
     IReadOnlyList<CompetitorRateDto> LatestRates);
 
 public sealed record CompetitorCreateDto(string Name, string SourceUrl);

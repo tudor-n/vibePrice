@@ -31,6 +31,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
     public DbSet<ScrapedRate> ScrapedRates => Set<ScrapedRate>();
     public DbSet<ScrapeRun> ScrapeRuns => Set<ScrapeRun>();
     public DbSet<Event> Events => Set<Event>();
+    public DbSet<PointOfInterest> PointsOfInterest => Set<PointOfInterest>();
     public DbSet<DemandSignal> DemandSignals => Set<DemandSignal>();
     public DbSet<Recommendation> Recommendations => Set<Recommendation>();
     public DbSet<OwnBooking> OwnBookings => Set<OwnBooking>();
@@ -67,6 +68,11 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
             e.Property(x => x.Name).HasMaxLength(200);
             e.Property(x => x.City).HasMaxLength(100);
             e.Property(x => x.Address).HasMaxLength(500);
+            e.Property(x => x.PlaceId).HasMaxLength(300);
+            e.Property(x => x.Latitude).HasPrecision(9, 6);
+            e.Property(x => x.Longitude).HasPrecision(9, 6);
+            e.Property(x => x.Rating).HasPrecision(2, 1);
+            e.Property(x => x.PlaceCandidates).HasColumnType("jsonb");
             e.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId);
         });
 
@@ -85,6 +91,12 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
             e.HasIndex(x => x.TenantId);
             e.Property(x => x.Name).HasMaxLength(200);
             e.Property(x => x.SourceUrl).HasMaxLength(2000);
+            e.Property(x => x.PlaceId).HasMaxLength(300);
+            e.Property(x => x.Latitude).HasPrecision(9, 6);
+            e.Property(x => x.Longitude).HasPrecision(9, 6);
+            e.Property(x => x.Rating).HasPrecision(2, 1);
+            e.Property(x => x.PlaceCandidates).HasColumnType("jsonb");
+            e.Property(x => x.DiscoverySource).HasMaxLength(50);
             e.HasOne<Property>().WithMany().HasForeignKey(x => x.PropertyId);
         });
 
@@ -108,6 +120,15 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
             e.Property(x => x.City).HasMaxLength(100);
             e.Property(x => x.Name).HasMaxLength(300);
             e.Property(x => x.Source).HasMaxLength(100);
+        });
+
+        modelBuilder.Entity<PointOfInterest>(e =>
+        {
+            e.HasIndex(x => x.City);
+            e.Property(x => x.City).HasMaxLength(100);
+            e.Property(x => x.Name).HasMaxLength(300);
+            e.Property(x => x.Latitude).HasPrecision(9, 6);
+            e.Property(x => x.Longitude).HasPrecision(9, 6);
         });
 
         modelBuilder.Entity<DemandSignal>(e =>
