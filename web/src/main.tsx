@@ -3,6 +3,14 @@ import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider } from 'react-router-dom';
 import { router } from './router';
+// Self-hosted fonts (no runtime Google Fonts): DM Serif Display for headings,
+// Spectral for body — the watercolor-storybook type pair from the design handoff.
+import '@fontsource/dm-serif-display/400.css';
+import '@fontsource/dm-serif-display/400-italic.css';
+import '@fontsource/spectral/400.css';
+import '@fontsource/spectral/500.css';
+import '@fontsource/spectral/600.css';
+import '@fontsource/spectral/700.css';
 import './styles/global.css';
 
 const queryClient = new QueryClient({

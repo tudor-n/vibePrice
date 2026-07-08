@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { formatMoney, Money } from './Money';
+import { formatMoney, formatMoneyBare, Money } from './Money';
 
 // Intl may emit no-break / narrow no-break spaces; \s matches them all.
 describe('formatMoney', () => {
@@ -14,6 +14,23 @@ describe('formatMoney', () => {
 
   it('formats negative amounts with a minus sign', () => {
     expect(formatMoney(-120, 'RON')).toMatch(/^[-−]120,00\sRON$/);
+  });
+
+  it('stripWholeFraction drops ,00 on whole amounts but never rounds', () => {
+    expect(formatMoney(440, 'RON', { stripWholeFraction: true })).toMatch(
+      /^440\sRON$/,
+    );
+    expect(formatMoney(412.5, 'RON', { stripWholeFraction: true })).toMatch(
+      /^412,50\sRON$/,
+    );
+  });
+});
+
+describe('formatMoneyBare', () => {
+  it('renders the number alone (currency stated by the adjacent figure)', () => {
+    expect(formatMoneyBare(380)).toBe('380');
+    expect(formatMoneyBare(412.5)).toBe('412,5');
+    expect(formatMoneyBare(1234)).toMatch(/^1\.234$/);
   });
 });
 

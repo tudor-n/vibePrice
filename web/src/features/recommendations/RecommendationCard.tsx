@@ -55,6 +55,8 @@ interface RecommendationCardProps {
   onDismiss?: (recommendationId: string) => void;
   /** Disables the action buttons while a status update is in flight. */
   busy?: boolean;
+  /** Terracotta ring after arriving here from a calendar day cell. */
+  highlighted?: boolean;
 }
 
 export function RecommendationCard({
@@ -63,6 +65,7 @@ export function RecommendationCard({
   onAccept,
   onDismiss,
   busy = false,
+  highlighted = false,
 }: RecommendationCardProps) {
   const { factors } = recommendation;
   // Defensive: the payload is server-produced, versioned JSON. Render what
@@ -76,7 +79,10 @@ export function RecommendationCard({
   const isPending = recommendation.status === 'pending';
 
   return (
-    <article className="rec-card" aria-label="Price recommendation">
+    <article
+      className={highlighted ? 'rec-card rec-card-highlight' : 'rec-card'}
+      aria-label="Price recommendation"
+    >
       <header className="rec-card-header">
         <div>
           <h3 className="rec-card-date">{formatDate(recommendation.stayDate)}</h3>

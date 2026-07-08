@@ -6,16 +6,21 @@ import {
 import { useSelectedProperty } from '../../app/PropertyContext';
 import type { Recommendation } from '../../api/types';
 import { EmptyState, ErrorState, LoadingState } from '../../components/States';
+import { HandUnderline } from '../../components/icons';
 import { RecommendationCard } from './RecommendationCard';
+import { PriceCalendar } from './PriceCalendar';
+import type { CalendarRow } from './calendarModel';
+import houseSage from '../../assets/houses/house-sage.png';
 
 function isoDate(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
-function defaultRange(): { from: string; to: string } {
+/** The calendar horizon: today through the engine's 90-day window. */
+function calendarRange(): { from: string; to: string } {
   const from = new Date();
   const to = new Date();
-  to.setDate(to.getDate() + 30);
+  to.setDate(to.getDate() + 90);
   return { from: isoDate(from), to: isoDate(to) };
 }
 
@@ -44,13 +49,18 @@ function groupByPeriod(recommendations: Recommendation[]): Map<string, Recommend
   return groups;
 }
 
+function prefersReducedMotion(): boolean {
+  return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+}
+
 export function RecommendationsPage() {
-  const [{ from, to }, setRange] = useState(defaultRange);
+  const [{ from, to }] = useState(calendarRange);
   // Property comes from the app-wide selector in the header.
   const { properties, property } = useSelectedProperty();
 
   const recommendations = useRecommendations(property?.id, from, to);
   const updateStatus = useUpdateRecommendationStatus();
+  const [highlightId, setHighlightId] = useState<string | null>(null);
 
   const roomTypeNames = useMemo(() => {
     const names = new Map<string, string>();
@@ -60,6 +70,17 @@ export function RecommendationsPage() {
     return names;
   }, [property]);
 
+  // Calendar input: recommendations joined with their room type display name.
+  const calendarRows: CalendarRow[] = useMemo(
+    () =>
+      (recommendations.data ?? []).map((recommendation) => ({
+        ...recommendation,
+        roomTypeName:
+          roomTypeNames.get(recommendation.roomTypeId) ?? 'Unknown room type',
+      })),
+    [recommendations.data, roomTypeNames],
+  );
+
   if (properties.isPending) return <LoadingState what="your properties" />;
   if (properties.isError) return <ErrorState error={properties.error} />;
   if (!properties.data || properties.data.length === 0) {
@@ -68,41 +89,49 @@ export function RecommendationsPage() {
     );
   }
 
+  function handleDayClick(recommendationId: string) {
+    setHighlightId(recommendationId);
+    const card = document.getElementById(`rec-${recommendationId}`);
+    card?.scrollIntoView?.({
+      behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+      block: 'start',
+    });
+  }
+
   const groups = recommendations.data ? groupByPeriod(recommendations.data) : null;
 
   return (
     <div className="page">
-      <h2>Recommendations</h2>
+      <h2>Recommendations &amp; price calendar</h2>
+      <HandUnderline width={210} />
       <p className="page-intro">
-        Suggested prices for upcoming stay dates, each with the full reasoning.
-        Accept the ones you agree with — nothing changes without your approval.
+        Your rate for each night against the local competitor band — with the
+        days worth acting on called out. Accept the suggestions you agree
+        with; nothing changes without your approval.
       </p>
-
-      <form className="filters" onSubmit={(event) => event.preventDefault()}>
-        <label className="field">
-          From
-          <input
-            type="date"
-            value={from}
-            onChange={(event) => setRange((r) => ({ ...r, from: event.target.value }))}
-          />
-        </label>
-        <label className="field">
-          To
-          <input
-            type="date"
-            value={to}
-            onChange={(event) => setRange((r) => ({ ...r, to: event.target.value }))}
-          />
-        </label>
-      </form>
 
       {updateStatus.isError && <ErrorState error={updateStatus.error} />}
 
       {recommendations.isPending && <LoadingState what="recommendations" />}
       {recommendations.isError && <ErrorState error={recommendations.error} />}
+
       {groups && groups.size === 0 && (
-        <EmptyState message="No recommendations for this period yet. Trigger a refresh from the Dashboard or widen the date range." />
+        <div className="empty-card">
+          <img src={houseSage} alt="" />
+          <h3>All quiet on your street</h3>
+          <p>
+            No price suggestions for the next 90 days. Trigger a refresh from
+            the Dashboard and we'll nudge you the moment something changes.
+          </p>
+        </div>
+      )}
+
+      {property && calendarRows.length > 0 && (
+        <PriceCalendar
+          rows={calendarRows}
+          propertyName={property.name}
+          onDayClick={handleDayClick}
+        />
       )}
 
       {groups &&
@@ -111,18 +140,20 @@ export function RecommendationsPage() {
             <h3 className="rec-group-title">{period}</h3>
             <div className="rec-group-list">
               {items.map((recommendation) => (
-                <RecommendationCard
-                  key={recommendation.id}
-                  recommendation={recommendation}
-                  roomTypeName={roomTypeNames.get(recommendation.roomTypeId)}
-                  busy={updateStatus.isPending}
-                  onAccept={(recommendationId) =>
-                    updateStatus.mutate({ recommendationId, status: 'accepted' })
-                  }
-                  onDismiss={(recommendationId) =>
-                    updateStatus.mutate({ recommendationId, status: 'dismissed' })
-                  }
-                />
+                <div key={recommendation.id} id={`rec-${recommendation.id}`}>
+                  <RecommendationCard
+                    recommendation={recommendation}
+                    roomTypeName={roomTypeNames.get(recommendation.roomTypeId)}
+                    busy={updateStatus.isPending}
+                    highlighted={highlightId === recommendation.id}
+                    onAccept={(recommendationId) =>
+                      updateStatus.mutate({ recommendationId, status: 'accepted' })
+                    }
+                    onDismiss={(recommendationId) =>
+                      updateStatus.mutate({ recommendationId, status: 'dismissed' })
+                    }
+                  />
+                </div>
               ))}
             </div>
           </section>

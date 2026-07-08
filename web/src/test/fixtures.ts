@@ -74,3 +74,26 @@ export const fixtureRecommendation: Recommendation = {
   factors: fixtureFactors,
   createdAt: '2026-06-01T05:00:00Z',
 };
+
+/**
+ * Factors v2 (shared/contracts/recommendation-factors.md): the
+ * `competitor_position` factor carries `band_low`/`band_high` — the min/max
+ * of the competitor rates used for that stay date. The price calendar
+ * consumes these; v1 rows (above) must keep rendering without a band.
+ */
+export const fixtureFactorsV2: RecommendationFactors = {
+  ...fixtureFactors,
+  engine_version: '2',
+  factors: fixtureFactors.factors.map((factor) =>
+    factor.rule === 'competitor_position'
+      ? { ...factor, band_low: 380.0, band_high: 455.0 }
+      : factor,
+  ),
+};
+
+export const fixtureRecommendationV2: Recommendation = {
+  ...fixtureRecommendation,
+  id: '8a1b3c0f-5c8d-4d2e-9f10-23456789abcd',
+  stayDate: '2026-06-14',
+  factors: fixtureFactorsV2,
+};
