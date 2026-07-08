@@ -126,6 +126,29 @@ def test_get_places_provider_defaults_to_fixture_adapter():
     assert isinstance(provider, FixtureAdapter)
 
 
+def test_google_adapter_text_search_raises_on_non_ok_status():
+    body = __import__("json").dumps(
+        {"results": [], "status": "REQUEST_DENIED", "error_message": "API key invalid"}
+    )
+
+    def fake_get(url: str) -> str:  # injected; no network
+        return body
+
+    provider = GoogleAdapter(api_key="test", http_get=fake_get)
+    with pytest.raises(RuntimeError, match="REQUEST_DENIED"):
+        provider.text_search("Continental Forum", city="sibiu")
+
+
+def test_google_adapter_text_search_zero_results_returns_empty_list():
+    body = __import__("json").dumps({"results": [], "status": "ZERO_RESULTS"})
+
+    def fake_get(url: str) -> str:  # injected; no network
+        return body
+
+    provider = GoogleAdapter(api_key="test", http_get=fake_get)
+    assert provider.text_search("Nonexistent Hotel", city="sibiu") == []
+
+
 def test_get_places_provider_google_without_key_raises(monkeypatch):
     from pricepilot import config
 
