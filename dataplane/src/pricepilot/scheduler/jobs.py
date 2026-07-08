@@ -32,6 +32,9 @@ from pricepilot.engine.models import RuleContext
 from pricepilot.engine.pipeline import compute
 from pricepilot.engine.serialization import to_jsonable
 from pricepilot.ingest.events import EventRecord, StaticSibiuEventSource, upsert_events
+from pricepilot.ingest.holidays import holiday_signal_records
+from pricepilot.ingest.signals import upsert_signals
+from pricepilot.ingest.weather import CITY_COORDS, fetch_weather_signals
 from pricepilot.scrapers.client import PoliteClient
 from pricepilot.scrapers.orchestrator import SupportsGet, competitors_by_city, scrape_city
 
@@ -188,12 +191,54 @@ def handle_ingest_events(session: Session, payload: dict[str, Any]) -> dict[str,
     return {"city": city, "events_written": written}
 
 
-def handle_ingest_demand_signals(session: Session, payload: dict[str, Any]) -> dict[str, Any]:
-    """Refresh public stats/holidays/weather signals for a city."""
-    logger.info("ingest.demand_signals stub: payload=%s", payload)
-    # TODO: run ingest.holidays / ingest.tourism_stats / ingest.weather and
-    # upsert into demand_signals.
-    return {"note": "stub — no signals ingested", "signals_written": 0}
+#: Holiday signals look this far ahead (a full year of bookable dates).
+HOLIDAY_WINDOW_DAYS = 365
+
+
+def handle_ingest_demand_signals(
+    session: Session,
+    payload: dict[str, Any],
+    *,
+    weather_http_get: Any = None,
+) -> dict[str, Any]:
+    """Refresh public demand signals (RO holidays + Open-Meteo weather) for a city.
+
+    All-or-nothing: any exception propagates, the poller rolls back and marks
+    the job failed, and the nightly schedule retries. Weather is skipped with
+    a note for cities without coordinates (holidays are pure computation and
+    always available). Upserts are idempotent on (city, signal_type, date);
+    ``created_at`` refreshes on re-ingest — it is the freshness marker.
+    ``weather_http_get`` is injectable for tests (fixtures, never the network).
+    """
+    city = (payload.get("city") or "sibiu").strip().lower()
+    today = date.today()
+
+    holiday_records = holiday_signal_records(
+        city, start=today, end=today + timedelta(days=HOLIDAY_WINDOW_DAYS)
+    )
+    holidays_written = upsert_signals(session, holiday_records, source="python-holidays")
+
+    weather_report: int | str
+    if city in CITY_COORDS:
+        weather_records = fetch_weather_signals(city, http_get=weather_http_get)
+        weather_written = upsert_signals(session, weather_records, source="open-meteo")
+        weather_report = weather_written
+    else:
+        weather_written = 0
+        weather_report = "skipped: no coordinates for city"
+
+    logger.info(
+        "ingest.demand_signals: city=%s holidays=%d weather=%s",
+        city,
+        holidays_written,
+        weather_report,
+    )
+    return {
+        "city": city,
+        "signals_written": holidays_written + weather_written,
+        "holidays_written": holidays_written,
+        "weather": weather_report,
+    }
 
 
 @dataclass(frozen=True)

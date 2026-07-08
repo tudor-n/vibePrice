@@ -72,6 +72,18 @@ fake market freshness). Semantics:
   (fix the competitor's name to match its OTA listing).
 - The job itself fails only when every attempted source wrote nothing.
 
+`ingest.demand_signals`:
+
+```json
+{"city": "sibiu", "signals_written": 17, "holidays_written": 11, "weather": 6}
+```
+
+`weather` is a count, or the string `"skipped: no coordinates for city"` for cities
+missing from the dataplane's coordinate map. Signals upsert idempotently on
+(city, signal_type, signal_date); `created_at` refreshes on re-ingest (freshness
+marker). Signal types so far: `public_holiday` (value 1), `weather.temp_max_c`,
+`weather.precipitation_mm`.
+
 ## Dashboard "Refresh data now"
 
 The dashboard button enqueues three jobs in order: `scrape.competitor_rates` (property
