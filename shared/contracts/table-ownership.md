@@ -32,7 +32,7 @@ EF Core entity + migration, and the SQLAlchemy model.
 
 - All identifiers snake_case. Primary keys `id UUID`. Timestamps `timestamptz`, UTC, named `*_at`.
 - Every tenant-owned table has `tenant_id UUID NOT NULL` + index. City-scoped shared data
-  (`events`, `demand_signals`, `scraped_rates`, `scrape_runs`) is NOT tenant-scoped.
+  (`events`, `demand_signals`, `scraped_rates`, `scrape_runs`, `points_of_interest`) is NOT tenant-scoped.
 - Money: `numeric(10,2)` + `currency char(3)` (ISO 4217). Never floats.
 - `recommendations.factors` is JSONB; its shape is defined in `recommendation-factors.md`.
 - `jobs` payloads/types are defined in `jobs.md`.

@@ -223,7 +223,7 @@ components:
       properties:
         id: { type: string, format: uuid }
         name: { type: string }
-        sourceUrl: { type: string }
+        sourceUrl: { type: string, nullable: true }
         latestRates:
           type: array
           items:
