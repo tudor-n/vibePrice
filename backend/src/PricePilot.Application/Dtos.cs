@@ -29,6 +29,10 @@ public sealed record PropertyDto(
 
 public sealed record PropertyCreateDto(string Name, string City, string? Address);
 
+public sealed record PlacePickDto(string PlaceId);
+
+public sealed record ResolvePlaceDto(string? Query);
+
 public sealed record RecommendationDto(
     Guid Id,
     Guid RoomTypeId,

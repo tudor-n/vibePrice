@@ -15,4 +15,13 @@ public interface IPropertyService
 
     /// <summary>Returns null when the property does not exist for the current tenant.</summary>
     Task<CompetitorDto?> AddCompetitorAsync(Guid propertyId, CompetitorCreateDto dto, CancellationToken ct);
+
+    /// <summary>Copies the chosen stored candidate's fields onto the property and marks it resolved.
+    /// Returns false when the property isn't the caller's; throws <see cref="PlaceCandidateNotFoundException"/>
+    /// when placeId isn't among the stored candidates.</summary>
+    Task<bool> PickPlaceAsync(Guid propertyId, string placeId, CancellationToken ct);
+
+    /// <summary>Confirms ownership so the endpoint can enqueue a fresh resolve_place job.
+    /// Returns false when the property isn't the caller's.</summary>
+    Task<bool> ClearResolutionForRetryAsync(Guid propertyId, CancellationToken ct);
 }

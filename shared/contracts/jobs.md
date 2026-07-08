@@ -16,7 +16,7 @@ in this table too, for observability from the dashboard.
 | `ingest.events` | `{"city": "sibiu"}` | Refresh events calendar for a city |
 | `ingest.demand_signals` | `{"city": "sibiu"}` | Refresh public stats/holidays/weather signals |
 | `engine.generate_recommendations` | `{"tenant_id": "<uuid>\|null", "property_id": "<uuid>\|null", "horizon_days": 90}` | Recompute recommendations; nulls mean "all" |
-| `resolve_place` | `{"property_id": "<uuid>"}` | Resolve a property to a Google place (text search), write place_id/geo/rating + top-5 candidates, then enqueue discover_competitors |
+| `resolve_place` | `{"property_id": "<uuid>", "query": "<string>\|absent"}` | Resolve a property to a Google place (text search), write place_id/geo/rating + top-5 candidates, then enqueue discover_competitors. `query` overrides the default search text (property name + city) when present; enqueued by `POST /properties/{id}/resolve-place` |
 | `discover_competitors` | `{"property_id": "<uuid>"}` | Nearby-search lodging around the resolved property; upsert competitor rows with Google data; skip the property's own place and tombstoned (excluded) rows |
 
 ## Row shape

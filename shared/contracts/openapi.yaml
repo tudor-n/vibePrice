@@ -63,6 +63,44 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Property" }
+  /properties/{propertyId}/place:
+    patch:
+      summary: Pick a stored Google place candidate as the property's resolved place (owner correction)
+      parameters:
+        - { name: propertyId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PlacePick" }
+      responses:
+        "200":
+          description: Candidate's fields copied onto the property; placeStatus becomes "resolved"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Property" }
+        "400":
+          description: placeId is missing, or not among the property's stored placeCandidates
+        "404":
+          description: Property does not belong to the caller's tenant (indistinguishable from a nonexistent id)
+  /properties/{propertyId}/resolve-place:
+    post:
+      summary: Re-enqueue resolve_place for a property (owner-triggered retry, optionally with a search query override)
+      parameters:
+        - { name: propertyId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ResolvePlace" }
+      responses:
+        "202":
+          description: Queued
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Job" }
+        "404":
+          description: Property does not belong to the caller's tenant (indistinguishable from a nonexistent id)
   /properties/{propertyId}/recommendations:
     get:
       summary: Dated price recommendations for a property
@@ -208,6 +246,15 @@ components:
         longitude: { type: number, nullable: true }
         rating: { type: number, nullable: true }
         ratingCount: { type: integer, nullable: true }
+    PlacePick:
+      type: object
+      required: [placeId]
+      properties:
+        placeId: { type: string, description: "Must match one of the property's stored placeCandidates" }
+    ResolvePlace:
+      type: object
+      properties:
+        query: { type: string, description: "Search text override; absent means use the property's name + city" }
     PropertyCreate:
       type: object
       required: [name, city]

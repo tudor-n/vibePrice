@@ -122,6 +122,28 @@ public sealed class PropertyService(AppDbContext db, ITenantContext tenantContex
         return new CompetitorDto(competitor.Id, competitor.Name, competitor.SourceUrl, []);
     }
 
+    public async Task<bool> PickPlaceAsync(Guid propertyId, string placeId, CancellationToken ct)
+    {
+        var property = await db.Properties.FirstOrDefaultAsync(p => p.Id == propertyId, ct);
+        if (property is null) return false; // tenant filter => foreign id is "not found"
+
+        var candidates = DeserializeCandidates(property.PlaceCandidates);
+        var chosen = candidates.FirstOrDefault(c => c.PlaceId == placeId)
+            ?? throw new PlaceCandidateNotFoundException(placeId);
+
+        property.PlaceId = chosen.PlaceId;
+        property.Latitude = chosen.Latitude;
+        property.Longitude = chosen.Longitude;
+        property.Rating = chosen.Rating;
+        property.RatingCount = chosen.RatingCount;
+        property.PlaceResolvedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync(ct);
+        return true;
+    }
+
+    public async Task<bool> ClearResolutionForRetryAsync(Guid propertyId, CancellationToken ct) =>
+        await db.Properties.AsNoTracking().AnyAsync(p => p.Id == propertyId, ct);
+
     private static PropertyDto ToDto(Property property, IEnumerable<RoomType> roomTypes)
     {
         var status = property.PlaceResolvedAt is not null ? "resolved"

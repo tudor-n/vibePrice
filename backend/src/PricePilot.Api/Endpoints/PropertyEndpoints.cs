@@ -69,6 +69,39 @@ public static class PropertyEndpoints
                 : Results.Created($"/api/v1/properties/{propertyId}/competitors", created);
         });
 
+        group.MapPatch("/{propertyId:guid}/place", async (
+            Guid propertyId, PlacePickDto dto, IPropertyService properties, CancellationToken ct) =>
+        {
+            if (string.IsNullOrWhiteSpace(dto.PlaceId))
+                return Results.BadRequest(new { error = "placeId is required" });
+            try
+            {
+                var ok = await properties.PickPlaceAsync(propertyId, dto.PlaceId, ct);
+                if (!ok) return Results.NotFound();
+                var updated = (await properties.ListAsync(ct)).First(p => p.Id == propertyId);
+                return Results.Ok(updated);
+            }
+            catch (PlaceCandidateNotFoundException ex)
+            {
+                return Results.BadRequest(new { error = ex.Message });
+            }
+        });
+
+        group.MapPost("/{propertyId:guid}/resolve-place", async (
+            Guid propertyId, ResolvePlaceDto dto, IPropertyService properties,
+            IJobDispatcher jobs, CancellationToken ct) =>
+        {
+            if (!await properties.ClearResolutionForRetryAsync(propertyId, ct))
+                return Results.NotFound();
+            var query = string.IsNullOrWhiteSpace(dto.Query) ? null : dto.Query.Trim();
+            var json = query is null
+                ? $$"""{"property_id":"{{propertyId}}"}"""
+                : $$"""{"property_id":"{{propertyId}}","query":{{JsonSerializer.Serialize(query)}}}""";
+            using var payloadDoc = JsonDocument.Parse(json);
+            var job = await jobs.EnqueueAsync(JobTypes.ResolvePlace, payloadDoc.RootElement.Clone(), null, ct);
+            return Results.Accepted($"/api/v1/jobs/{job.Id}", job);
+        });
+
         group.MapGet("/{propertyId:guid}/recommendations", async (
             Guid propertyId,
             DateOnly? from,
