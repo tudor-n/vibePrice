@@ -50,8 +50,9 @@ def test_top_level_keys_match_contract() -> None:
     }
 
 
-def test_engine_version_is_1() -> None:
-    assert _payload()["engine_version"] == "1"
+def test_engine_version_is_2() -> None:
+    # v2: competitor_position carries band_low/band_high (contract changelog).
+    assert _payload()["engine_version"] == "2"
 
 
 def test_money_fields_are_decimal_never_float() -> None:
@@ -81,6 +82,8 @@ def test_rule_specific_extras_are_included() -> None:
     factors = {f["rule"]: f for f in _payload()["factors"]}
     assert factors["event_impact"]["event_ids"] == [str(FITS.id)]
     assert factors["competitor_position"]["sample_size"] == 3
+    assert factors["competitor_position"]["band_low"] == Decimal("400.00")
+    assert factors["competitor_position"]["band_high"] == Decimal("440.00")
 
 
 def test_expected_impact_block() -> None:

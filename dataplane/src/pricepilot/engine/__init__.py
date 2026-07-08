@@ -6,4 +6,6 @@ with a human-readable reason; ``pipeline.compute`` combines them into a price;
 ``shared/contracts/recommendation-factors.md``.
 """
 
-ENGINE_VERSION = "1"
+# "2": competitor_position factor carries band_low/band_high
+# (shared/contracts/recommendation-factors.md changelog).
+ENGINE_VERSION = "2"

@@ -42,5 +42,10 @@ def apply(ctx: RuleContext) -> FactorResult:
             f"({direction} your {ctx.current_price} {ctx.currency}); "
             f"moving halfway toward market, capped at ±{MAX_ADJUSTMENT_PCT}%."
         ),
-        extra={"sample_size": len(rates)},
+        extra={
+            "sample_size": len(rates),
+            # Contract v2: the market band the dashboard calendar renders.
+            "band_low": min(rates),
+            "band_high": max(rates),
+        },
     )

@@ -100,12 +100,23 @@ class TestCompetitorPosition:
         assert result.adjustment_pct == Decimal("0.0")
         assert "No competitor rates" in result.reason
         assert result.extra["sample_size"] == 0
+        # Contract v2: the band exists iff sample_size > 0.
+        assert "band_low" not in result.extra
+        assert "band_high" not in result.extra
 
     def test_market_at_current_price_is_zero(self) -> None:
         rates = [Decimal("300.00"), Decimal("350.00"), Decimal("400.00")]
         result = competitor_position.apply(make_ctx(competitor_rates=rates))
         assert result.adjustment_pct == Decimal("0.0")
         assert result.extra["sample_size"] == 3
+
+    def test_band_carries_market_min_and_max(self) -> None:
+        rates = [Decimal("300.00"), Decimal("350.00"), Decimal("400.00")]
+        result = competitor_position.apply(make_ctx(competitor_rates=rates))
+        assert result.extra["band_low"] == Decimal("300.00")
+        assert result.extra["band_high"] == Decimal("400.00")
+        assert isinstance(result.extra["band_low"], Decimal)  # money is never float
+        assert isinstance(result.extra["band_high"], Decimal)
 
     def test_moves_halfway_toward_market(self) -> None:
         # median 420 vs current 350: gap +20%, half the gap = +10.0%
