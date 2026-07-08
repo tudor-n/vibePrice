@@ -1,27 +1,28 @@
-"""Airbnb scraper stub.
+"""Airbnb scraper — registered but not implemented.
 
-Airbnb renders listings client-side, so this scraper will likely need a JSON
-API endpoint or a rendered-HTML capture rather than plain page HTML. Not
-implemented in v1 scaffolding.
+Airbnb search results are client-rendered (JS), so this source needs a
+browser-based fetcher or an API rather than plain page HTML. It stays in the
+registry with ``implemented = False`` so scrape-job results report the gap
+explicitly instead of silently ignoring Airbnb competitors (see roadmap).
 """
 
 from datetime import date
+from typing import ClassVar
 
-from pricepilot.scrapers.base import BaseScraper, ParsedRate, RateObservation
+from pricepilot.scrapers.base import ListingRate, PlannedRequest, SearchScraper
+
+_NOT_IMPLEMENTED = (
+    "Airbnb search results are client-rendered; a browser-based fetcher or "
+    "API integration is needed — see docs/roadmap.md."
+)
 
 
-class AirbnbScraper(BaseScraper):
+class AirbnbScraper(SearchScraper):
     name = "airbnb"
+    implemented: ClassVar[bool] = False
 
-    def parse(self, html: str) -> list[ParsedRate]:
-        raise NotImplementedError(
-            "AirbnbScraper.parse is not implemented yet. Capture a fixture into "
-            "tests/fixtures/ first, then implement parsing against it "
-            "(see scrapers/booking.py for the pattern)."
-        )
+    def plan_request(self, city: str, stay_date: date) -> PlannedRequest:
+        raise NotImplementedError(_NOT_IMPLEMENTED)
 
-    def fetch(self, source_url: str, stay_dates: list[date]) -> list[RateObservation]:
-        raise NotImplementedError(
-            "AirbnbScraper.fetch is not implemented yet. Tests must never trigger "
-            "live fetches — use tests/fixtures/ HTML instead."
-        )
+    def parse_listings(self, html: str) -> list[ListingRate]:
+        raise NotImplementedError(_NOT_IMPLEMENTED)

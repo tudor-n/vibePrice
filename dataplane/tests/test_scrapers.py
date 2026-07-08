@@ -4,29 +4,125 @@ from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
+import pytest
+
 from pricepilot.scrapers import SCRAPERS
-from pricepilot.scrapers.booking import BookingScraper, parse_rates
+from pricepilot.scrapers.airbnb import AirbnbScraper
+from pricepilot.scrapers.base import ListingRate
+from pricepilot.scrapers.booking import (
+    BookingScraper,
+    build_search_url,
+    detect_currency,
+    parse_listings,
+    parse_price,
+)
 
 
-def test_booking_parse_rates_from_fixture(fixtures_dir: Path) -> None:
-    html = (fixtures_dir / "booking_sample.html").read_text(encoding="utf-8")
-    rates = parse_rates(html)
+def test_build_search_url_exact() -> None:
+    url = build_search_url("sibiu", date(2026, 8, 7))
+    assert url == (
+        "https://www.booking.com/searchresults.html"
+        "?ss=sibiu&checkin=2026-08-07&checkout=2026-08-08"
+        "&group_adults=2&no_rooms=1&group_children=0"
+        "&selected_currency=RON&lang=en-us"
+    )
 
-    assert [(r.stay_date, r.price, r.currency) for r in rates] == [
-        (date(2026, 6, 12), Decimal("412.00"), "RON"),
-        (date(2026, 6, 13), Decimal("435.50"), "RON"),
-        (date(2026, 6, 14), Decimal("398.00"), "RON"),
+
+def test_build_search_url_honors_currency() -> None:
+    url = build_search_url("sibiu", date(2026, 8, 7), currency="EUR")
+    assert "selected_currency=EUR" in url
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("RON 412", Decimal("412")),
+        ("412 lei", Decimal("412")),
+        ("1.234 lei", Decimal("1234")),  # RO thousands separator
+        ("RON 412,50", Decimal("412.50")),  # RO decimal comma
+        ("€ 1,234.56", Decimal("1234.56")),  # US-style both separators
+        ("RON 1 234", Decimal("1234")),  # NBSP-grouped
+        ("1 234 lei", Decimal("1234")),  # narrow NBSP
+        ("1.234.567 lei", Decimal("1234567")),
+        ("Sold out", None),
+        ("", None),
+    ],
+)
+def test_parse_price(text: str, expected: Decimal | None) -> None:
+    result = parse_price(text)
+    assert result == expected
+    if result is not None:
+        assert isinstance(result, Decimal)  # money is never float
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("RON 412", "RON"),
+        ("412 lei", "RON"),
+        ("€ 95", "EUR"),
+        ("EUR 95", "EUR"),
+        ("US$120", "USD"),
+        ("$120", "USD"),
+        ("412", None),
+    ],
+)
+def test_detect_currency(text: str, expected: str | None) -> None:
+    assert detect_currency(text) == expected
+
+
+def test_parse_listings_from_search_fixture(fixtures_dir: Path) -> None:
+    html = (fixtures_dir / "booking_search_sibiu.html").read_text(encoding="utf-8")
+    listings = parse_listings(html)
+
+    assert listings == [
+        ListingRate(name="Ramada by Wyndham Sibiu", price=Decimal("412"), currency="RON"),
+        ListingRate(
+            name="Hotel Împăratul Romanilor", price=Decimal("389"), currency="RON"
+        ),
+        ListingRate(name="Casa Luxemburg", price=Decimal("1234"), currency="RON"),
+        ListingRate(
+            name="Pensiunea Cetate Veche", price=Decimal("435.50"), currency="RON"
+        ),
+        ListingRate(name="Golden Tulip Ana Tower", price=Decimal("95"), currency="EUR"),
     ]
-    for rate in rates:
-        assert isinstance(rate.price, Decimal)  # money is never float
+    for listing in listings:
+        assert isinstance(listing.price, Decimal)
 
 
-def test_booking_sold_out_days_are_skipped(fixtures_dir: Path) -> None:
-    html = (fixtures_dir / "booking_sample.html").read_text(encoding="utf-8")
-    stay_dates = {r.stay_date for r in parse_rates(html)}
-    assert date(2026, 6, 15) not in stay_dates  # sold-out card has no price
+def test_sold_out_and_unpriced_cards_are_skipped(fixtures_dir: Path) -> None:
+    html = (fixtures_dir / "booking_search_sibiu.html").read_text(encoding="utf-8")
+    names = {listing.name for listing in parse_listings(html)}
+    assert "Hotel Sold Out Palace" not in names  # card without a price element
+
+
+def test_taxes_line_is_not_mistaken_for_the_price(fixtures_dir: Path) -> None:
+    html = (fixtures_dir / "booking_search_sibiu.html").read_text(encoding="utf-8")
+    ramada = next(
+        listing
+        for listing in parse_listings(html)
+        if listing.name == "Ramada by Wyndham Sibiu"
+    )
+    assert ramada.price == Decimal("412")  # not the "+RON 62 taxes" line
+
+
+def test_plan_request_builds_search_url_with_instance_currency() -> None:
+    plan = BookingScraper(currency="EUR").plan_request("sibiu", date(2026, 8, 7))
+    assert plan.stay_date == date(2026, 8, 7)
+    assert "selected_currency=EUR" in plan.url
+    assert "checkin=2026-08-07" in plan.url
 
 
 def test_registry_contains_isolated_sources() -> None:
     assert SCRAPERS["booking"] is BookingScraper
     assert set(SCRAPERS) == {"booking", "airbnb"}
+    assert BookingScraper.implemented is True
+    assert AirbnbScraper.implemented is False
+
+
+def test_airbnb_is_explicitly_unimplemented() -> None:
+    scraper = AirbnbScraper()
+    with pytest.raises(NotImplementedError):
+        scraper.plan_request("sibiu", date(2026, 8, 7))
+    with pytest.raises(NotImplementedError):
+        scraper.parse_listings("<html></html>")

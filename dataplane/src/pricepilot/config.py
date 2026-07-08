@@ -19,6 +19,17 @@ class Settings(BaseSettings):
     scheduler_enabled: bool = True
     log_level: str = "INFO"
 
+    # Scraping (ADR 0004): city-search pages, one request per stay date.
+    scrape_sources: str = "booking"
+    scrape_days_ahead: int = 90
+    scrape_delay_seconds: float = 4.0
+    scrape_timeout_seconds: float = 20.0
+    scrape_currency: str = "RON"
+
+    def scrape_source_list(self) -> list[str]:
+        """Enabled scraper names, parsed from the comma-separated env value."""
+        return [name.strip() for name in self.scrape_sources.split(",") if name.strip()]
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:

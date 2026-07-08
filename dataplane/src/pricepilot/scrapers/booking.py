@@ -1,47 +1,131 @@
-"""Booking.com scraper.
+"""Booking.com search-results scraper (pure: URL planning + parsing).
 
-Parsing is real (against the markup captured in
-``tests/fixtures/booking_sample.html``); live fetching is not implemented yet.
-Expect breakage whenever Booking.com changes markup — the fixture must then be
-re-captured and the selectors updated together.
+Strategy (ADR 0004): one search-results request per stay date returns every
+listed property in the city with its cheapest nightly rate; the orchestrator
+matches cards to competitors by name. Selectors target the ``data-testid``
+markup of current result cards; expect breakage whenever Booking.com changes
+markup — re-capture the fixture and fix the selectors together::
+
+    python -m pricepilot.scrapers.capture booking --city sibiu
+
+Prices are parsed defensively (RO "1.234 lei" thousands, "412,50" decimals,
+NBSP grouping, US "1,234.56") and a listing is skipped outright when its price
+or currency cannot be read with confidence — never guess money.
 """
 
-from datetime import date
-from decimal import Decimal
+import re
+from datetime import date, timedelta
+from decimal import Decimal, InvalidOperation
+from urllib.parse import urlencode
 
-from bs4 import BeautifulSoup, Tag
+from bs4 import BeautifulSoup
 
-from pricepilot.scrapers.base import BaseScraper, ParsedRate, RateObservation
+from pricepilot.scrapers.base import ListingRate, PlannedRequest, SearchScraper
+
+BOOKING_SEARCH_URL = "https://www.booking.com/searchresults.html"
+
+# \s in a str pattern matches Unicode whitespace incl. NBSP (\xa0) and
+# narrow NBSP (\u202f), which Booking uses to group digits.
+_PRICE_RE = re.compile(r"[0-9][0-9.,\s]*")
+
+#: The price element proper; taxes/strikethrough live in sibling testids.
+_PRICE_SELECTORS = (
+    '[data-testid="price-and-discounted-price"]',
+    'span[data-testid="price"]',
+)
 
 
-def parse_rates(html: str) -> list[ParsedRate]:
-    """Extract (stay_date, price, currency) triples from a Booking.com rates page.
+def build_search_url(city: str, stay_date: date, *, currency: str = "RON") -> str:
+    """Search-results URL for one night (checkin=stay date, checkout=+1)."""
+    params = {
+        "ss": city,
+        "checkin": stay_date.isoformat(),
+        "checkout": (stay_date + timedelta(days=1)).isoformat(),
+        "group_adults": 2,
+        "no_rooms": 1,
+        "group_children": 0,
+        "selected_currency": currency,
+        "lang": "en-us",
+    }
+    return f"{BOOKING_SEARCH_URL}?{urlencode(params)}"
 
-    Pure function — safe to test against saved HTML fixtures.
+
+def parse_price(text: str) -> Decimal | None:
+    """Extract a Decimal price from a display string, or None when unsure.
+
+    Separator rule: with both ``.`` and ``,`` present, the later one is the
+    decimal separator; a lone separator followed by exactly three digits is a
+    thousands separator, otherwise it is the decimal separator.
     """
+    match = _PRICE_RE.search(text)
+    if match is None:
+        return None
+    token = re.sub(r"\s+", "", match.group()).strip(".,")
+    if "." in token and "," in token:
+        if token.rfind(",") > token.rfind("."):
+            token = token.replace(".", "").replace(",", ".")
+        else:
+            token = token.replace(",", "")
+    elif "," in token:
+        head, _, tail = token.rpartition(",")
+        if len(tail) == 3 and head:
+            token = (head + tail).replace(",", "")
+        else:
+            token = f"{head.replace(',', '')}.{tail}" if head else tail
+    elif "." in token:
+        head, _, tail = token.rpartition(".")
+        if len(tail) == 3 and head:
+            token = (head + tail).replace(".", "")
+    try:
+        return Decimal(token)
+    except InvalidOperation:
+        return None
+
+
+def detect_currency(text: str) -> str | None:
+    """Map the currency tokens Booking actually displays; None = skip listing."""
+    lowered = text.casefold()
+    if "us$" in lowered or "usd" in lowered:
+        return "USD"
+    if "lei" in lowered or "ron" in lowered:
+        return "RON"
+    if "€" in text or "eur" in lowered:
+        return "EUR"
+    if "$" in text:
+        return "USD"
+    return None
+
+
+def parse_listings(html: str) -> list[ListingRate]:
+    """Extract (name, price, currency) from every priced property card."""
     soup = BeautifulSoup(html, "html.parser")
-    rates: list[ParsedRate] = []
-    for card in soup.select("div.rate-card[data-stay-date]"):
-        price_el = card.select_one("span.rate-price")
-        if not isinstance(price_el, Tag):
+    listings: list[ListingRate] = []
+    for card in soup.select('[data-testid="property-card"]'):
+        title_el = card.select_one('[data-testid="title"]')
+        price_el = next(
+            (found for sel in _PRICE_SELECTORS if (found := card.select_one(sel))),
+            None,
+        )
+        if title_el is None or price_el is None:
+            continue  # sold-out / unpriced card
+        name = title_el.get_text(strip=True)
+        price_text = price_el.get_text(" ", strip=True)
+        price = parse_price(price_text)
+        currency = detect_currency(price_text)
+        if not name or price is None or currency is None:
             continue
-        stay_date = date.fromisoformat(str(card["data-stay-date"]))
-        price = Decimal(price_el.get_text(strip=True))
-        currency = str(price_el.get("data-currency", "RON"))
-        rates.append(ParsedRate(stay_date=stay_date, price=price, currency=currency))
-    return rates
+        listings.append(ListingRate(name=name, price=price, currency=currency))
+    return listings
 
 
-class BookingScraper(BaseScraper):
+class BookingScraper(SearchScraper):
     name = "booking"
 
-    def parse(self, html: str) -> list[ParsedRate]:
-        return parse_rates(html)
-
-    def fetch(self, source_url: str, stay_dates: list[date]) -> list[RateObservation]:
-        raise NotImplementedError(
-            "BookingScraper.fetch is not implemented yet: it will use httpx with "
-            "Settings.scraper_user_agent / scraper_proxy_url to request availability "
-            "pages per stay date, then run parse(). Tests must never trigger live "
-            "fetches — use tests/fixtures/ HTML instead."
+    def plan_request(self, city: str, stay_date: date) -> PlannedRequest:
+        return PlannedRequest(
+            url=build_search_url(city, stay_date, currency=self.currency),
+            stay_date=stay_date,
         )
+
+    def parse_listings(self, html: str) -> list[ListingRate]:
+        return parse_listings(html)

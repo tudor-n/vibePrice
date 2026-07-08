@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Sibiu: 123 properties found | Booking.com (fixture)</title>
+</head>
+<body>
+  <!-- FIXTURE ONLY. Saved-HTML stand-in for a Booking.com search-results page,
+       modeled on the data-testid markup of real result cards (2026). Tests must
+       never fetch live pages; re-capture with:
+       python -m pricepilot.scrapers.capture booking --city sibiu -->
+  <header><nav aria-label="main">Booking.com fixture header</nav></header>
+  <main>
+    <h1>Sibiu: 123 properties found</h1>
+    <div data-testid="searchresults-list">
+
+      <div data-testid="property-card" class="c-property-card">
+        <div class="card-media"><img alt="" src="/img/ramada.jpg"></div>
+        <div class="card-body">
+          <h3><div data-testid="title">Ramada by Wyndham Sibiu</div></h3>
+          <div data-testid="review-score">8.6 · Fabulous · 1,204 reviews</div>
+          <div data-testid="distance">1.9 km from centre</div>
+          <div class="rate-block">
+            <span data-testid="availability-single">Deluxe Double Room</span>
+            <span data-testid="price-and-discounted-price" aria-hidden="true">RON&nbsp;412</span>
+            <span data-testid="taxes-and-charges">+RON 62 taxes and fees</span>
+          </div>
+        </div>
+      </div>
+
+      <div data-testid="property-card" class="c-property-card">
+        <div class="card-body">
+          <h3><div data-testid="title">Hotel Împăratul Romanilor</div></h3>
+          <div data-testid="review-score">8.1 · Very good</div>
+          <div class="rate-block">
+            <span data-testid="price-and-discounted-price">RON 389</span>
+            <span data-testid="taxes-and-charges">Includes taxes and fees</span>
+          </div>
+        </div>
+      </div>
+
+      <div data-testid="property-card" class="c-property-card">
+        <div class="card-body">
+          <h3><div data-testid="title">Casa Luxemburg</div></h3>
+          <div class="rate-block">
+            <span class="strikethrough" data-testid="strikethrough-price">1.450 lei</span>
+            <span data-testid="price-and-discounted-price">1.234 lei</span>
+          </div>
+        </div>
+      </div>
+
+      <div data-testid="property-card" class="c-property-card">
+        <div class="card-body">
+          <h3><div data-testid="title">Hotel Sold Out Palace</div></h3>
+          <div class="soldout-block">
+            <span class="soldout">You missed it! This property is sold out.</span>
+          </div>
+        </div>
+      </div>
+
+      <div data-testid="property-card" class="c-property-card">
+        <div class="card-body">
+          <h3><div data-testid="title">Pensiunea Cetate Veche</div></h3>
+          <div class="rate-block">
+            <span data-testid="price-and-discounted-price">435,50 lei</span>
+          </div>
+        </div>
+      </div>
+
+      <div data-testid="property-card" class="c-property-card">
+        <div class="card-body">
+          <h3><div data-testid="title">Golden Tulip Ana Tower</div></h3>
+          <div class="rate-block">
+            <span data-testid="price-and-discounted-price">€ 95</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+  <footer>© fixture — saved HTML for tests only, never fetched live.</footer>
+</body>
+</html>
