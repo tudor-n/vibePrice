@@ -98,9 +98,13 @@ plan: `superpowers/plans/2026-07-08-wave-3-market-data-and-watercolor-ui.md` · 
   pipeline smoke: claim → handler → succeeded results), backend 47/47 (0 warnings),
   web 74/74 + typecheck + build; compose config valid; live Open-Meteo sanity check;
   179 pending v2 recommendations regenerated on the dev DB.
-- [x] Code review (A+B): REQUEST CHANGES → all actionable findings fixed (tenant_id
-  gap, openapi drift, capture gitignore, issue aggregation); re-verify pending note
-  below. Part C review: see below.
+- [x] Code review (A+B): REQUEST CHANGES → all four actionable findings fixed and
+  self-verified with green suites (tenant_id trigger gap + 4 tests, openapi 400/404,
+  capture gitignore, issue aggregation); finding 4 (multi-city `scrape_runs.city` +
+  scoped freshness) deferred to backlog. Code review (C): **APPROVE**; all six
+  improvement findings applied anyway (13px event pill, dead CSS removed, refresh
+  failure-path test, weekday header exposed to SRs, band currency guard, per-room
+  month bounds). Final: web 75/75, backend 47/47, dataplane 168/168.
 
 **Booking.com live-run status:** the pipeline is fixture-verified end-to-end; the live
 site needs human-in-the-loop iteration (anti-bot). Loop:
@@ -113,12 +117,19 @@ selectors → `python -m pricepilot.scrapers.run --city sibiu --days 7` → `--w
 - [x] Schema-sync check (CI): SQLAlchemy models vs migrated schema diff — wave 2.2
 - [x] Partial unique index on pending recommendations `(room_type_id, stay_date)` — wave 2.2
 - [x] `test_demo_seed_is_idempotent` robust to stale dev volumes — wave 2.2
-- [ ] Real Booking.com scraper (live fetch + anti-bot handling; parser pattern exists) — needs human-in-the-loop iteration
-- [ ] Airbnb scraper
+- [x] Real Booking.com scraper pipeline (pure parser, polite client, matching,
+  orchestrator, CLIs) — wave 3. **Remaining: live-verify against real markup/anti-bot
+  (human-in-the-loop; loop documented under wave 3)**
+- [x] Weather ingestion via open-meteo (`ingest/weather.py`) — wave 3
+- [x] RO public holidays into demand_signals (`holidays` package) — wave 3
+- [ ] Airbnb scraper (search is client-rendered; needs browser-based fetcher or API behind the same pure interface)
 - [ ] INS Tempo tourism statistics ingestion (`ingest/tourism_stats.py`)
-- [ ] Weather ingestion via open-meteo (`ingest/weather.py`)
 - [ ] Events calendar scraping (replace StaticSibiuEventSource)
 - [ ] Hotel own-booking history import (CSV) → occupancy signal into engine
+- [ ] `scrape_runs.city` column + city-scoped freshness in `_load_rule_contexts`
+  (A+B review finding 4; needed before a second city onboards — EF migration +
+  SQLAlchemy + table-ownership.md in one PR)
+- [ ] Holiday/weather engine rules consuming demand_signals (factors contract bump)
 - [ ] Email notification connector (real SMTP) + weekly digest
 - [ ] WhatsApp connector (Meta Business API)
 - [ ] Recommendation accept → track outcomes; feedback loop dataset
