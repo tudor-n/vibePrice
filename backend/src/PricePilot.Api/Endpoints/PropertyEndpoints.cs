@@ -88,12 +88,12 @@ public static class PropertyEndpoints
         });
 
         group.MapPost("/{propertyId:guid}/resolve-place", async (
-            Guid propertyId, ResolvePlaceDto dto, IPropertyService properties,
+            Guid propertyId, ResolvePlaceDto? dto, IPropertyService properties,
             IJobDispatcher jobs, CancellationToken ct) =>
         {
             if (!await properties.ClearResolutionForRetryAsync(propertyId, ct))
                 return Results.NotFound();
-            var query = string.IsNullOrWhiteSpace(dto.Query) ? null : dto.Query.Trim();
+            var query = string.IsNullOrWhiteSpace(dto?.Query) ? null : dto.Query.Trim();
             var json = query is null
                 ? $$"""{"property_id":"{{propertyId}}"}"""
                 : $$"""{"property_id":"{{propertyId}}","query":{{JsonSerializer.Serialize(query)}}}""";

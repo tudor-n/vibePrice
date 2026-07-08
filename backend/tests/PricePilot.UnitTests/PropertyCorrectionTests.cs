@@ -116,6 +116,9 @@ public sealed class PropertyCorrectionTests : IDisposable
         var body = await resp.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("resolved", body.GetProperty("placeStatus").GetString());
         Assert.Equal(4.6, body.GetProperty("rating").GetDouble(), 3);
+        Assert.Equal(45.7960, body.GetProperty("latitude").GetDouble(), 4);
+        Assert.Equal(24.1520, body.GetProperty("longitude").GetDouble(), 4);
+        Assert.Equal(900, body.GetProperty("ratingCount").GetInt32());
     }
 
     [Fact]
@@ -152,7 +155,25 @@ public sealed class PropertyCorrectionTests : IDisposable
 
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        Assert.Equal(1, await db.Jobs.CountAsync(j => j.Type == "resolve_place"));
+        var job = await db.Jobs.AsNoTracking().SingleAsync(j => j.Type == "resolve_place");
+        Assert.Contains("Hotel Continental Forum Sibiu", job.Payload);
+    }
+
+    [Fact]
+    public async Task Resolve_place_with_empty_body_is_202()
+    {
+        var client = CreateTenantClient(_tenantA);
+        var propertyId = SeedPropertyWithCandidates(_tenantA);
+
+        // Truly empty body (no content), NOT "{}": the request body is optional.
+        var resp = await client.PostAsync($"/api/v1/properties/{propertyId}/resolve-place",
+            content: null);
+        Assert.Equal(HttpStatusCode.Accepted, resp.StatusCode);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var job = await db.Jobs.AsNoTracking().SingleAsync(j => j.Type == "resolve_place");
+        Assert.DoesNotContain("query", job.Payload);
     }
 
     [Fact]
