@@ -33,8 +33,7 @@ from pricepilot.engine.pipeline import compute
 from pricepilot.engine.serialization import to_jsonable
 from pricepilot.ingest.events import EventRecord, StaticSibiuEventSource, upsert_events
 from pricepilot.scrapers.client import PoliteClient
-from pricepilot.scrapers.matching import CompetitorRef
-from pricepilot.scrapers.orchestrator import SupportsGet, scrape_city
+from pricepilot.scrapers.orchestrator import SupportsGet, competitors_by_city, scrape_city
 
 logger = logging.getLogger(__name__)
 
@@ -134,20 +133,10 @@ def handle_scrape_competitor_rates(
     currency = settings.scrape_currency
     logger.info("scrape.competitor_rates: payload=%s sources=%s", payload, sources)
 
-    competitor_query = select(Competitor.id, Competitor.name, Property.city).join(
-        Property, Competitor.property_id == Property.id
+    scoped_competitors = competitors_by_city(
+        session, property_id=property_id, city=payload_city
     )
-    if property_id is not None:
-        competitor_query = competitor_query.where(Competitor.property_id == property_id)
-    elif payload_city is not None:
-        competitor_query = competitor_query.where(func.lower(Property.city) == payload_city)
-
-    competitors_by_city: dict[str, list[CompetitorRef]] = {}
-    for competitor_id, name, city in session.execute(competitor_query):
-        competitors_by_city.setdefault(city, []).append(
-            CompetitorRef(id=competitor_id, name=name)
-        )
-    if not competitors_by_city:
+    if not scoped_competitors:
         return {"rates_written": 0, "note": "no competitors configured for this scope"}
 
     owns_client = client is None
@@ -155,12 +144,12 @@ def handle_scrape_competitor_rates(
     try:
         cities: dict[str, Any] = {}
         total_written = 0
-        for city in sorted(competitors_by_city):
+        for city in sorted(scoped_competitors):
             city_result = scrape_city(
                 session,
                 active_client,
                 city=city,
-                competitors=competitors_by_city[city],
+                competitors=scoped_competitors[city],
                 stay_dates=stay_dates,
                 sources=sources,
                 currency=currency,

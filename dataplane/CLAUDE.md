@@ -108,14 +108,32 @@ fixture stand-in with the contract's fixed UUIDs.
    `shared/contracts/recommendation-factors.md` in the same PR and bump
    `ENGINE_VERSION` if the shape changes.
 
-### Scrapers
+### Scrapers (ADR 0004)
 
+- Scrapers are **fully pure**: `plan_request(city, stay_date)` +
+  `parse_listings(html)`. ALL network I/O lives in `scrapers/client.py`
+  (`PoliteClient`: jittered delay, bounded retries, blocked-detection);
+  matching + persistence live in `scrapers/orchestrator.py`.
+- Strategy: one city-search request per stay date covers every competitor in
+  town; listings are matched to competitors by significant-token name
+  matching (`scrapers/matching.py`) — unmatched names are surfaced per run.
 - Tests use saved HTML fixtures in `tests/fixtures/` **only** — never live
-  sites (repo hard rule). `parse` is pure; `fetch` does the I/O.
+  sites (repo hard rule). Inject fakes for the client; `PoliteClient` itself
+  is tested via `httpx.MockTransport`.
 - One module per source, registered in `SCRAPERS`. Keep sources isolated:
   they are fragile, expect breakage, and each must be swappable for a paid
-  rate API without touching the rest.
-- When markup changes, re-capture the fixture and fix the parser together.
+  rate API without touching the rest. `implemented = False` sources are
+  skipped-but-reported (Airbnb).
+- When markup changes (or you need live iteration against anti-bot):
+
+  ```powershell
+  # capture one live page as a fixture candidate + instant parse feedback
+  .venv\Scripts\python -m pricepilot.scrapers.capture booking --city sibiu
+  # dry-run the full pipeline against the dev DB's competitors (no writes)
+  .venv\Scripts\python -m pricepilot.scrapers.run --city sibiu --days 7
+  # persist for real (scraped_rates + scrape_runs)
+  .venv\Scripts\python -m pricepilot.scrapers.run --city sibiu --days 90 --write
+  ```
 
 ### Schema
 

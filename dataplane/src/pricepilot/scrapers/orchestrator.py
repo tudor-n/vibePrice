@@ -18,17 +18,45 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from typing import Any, Protocol
+from uuid import UUID
 
-from sqlalchemy import insert, update
+from sqlalchemy import func, insert, select, update
 from sqlalchemy.orm import Session
 
-from pricepilot.db.tables import ScrapedRate, ScrapeRun
+from pricepilot.db.tables import Competitor, Property, ScrapedRate, ScrapeRun
 from pricepilot.scrapers import SCRAPERS
 from pricepilot.scrapers.base import RateObservation, SearchScraper
 from pricepilot.scrapers.client import ScraperBlockedError, ScraperFetchError
 from pricepilot.scrapers.matching import CompetitorRef, match_listings
 
 logger = logging.getLogger(__name__)
+
+
+def competitors_by_city(
+    session: Session,
+    *,
+    property_id: UUID | None = None,
+    city: str | None = None,
+) -> dict[str, list[CompetitorRef]]:
+    """Resolve the scrape scope to competitors grouped by their property's city.
+
+    ``property_id`` wins over ``city``; both ``None`` means every property
+    (the system-wide nightly job — jobs.md: nulls mean "all").
+    """
+    query = select(Competitor.id, Competitor.name, Property.city).join(
+        Property, Competitor.property_id == Property.id
+    )
+    if property_id is not None:
+        query = query.where(Competitor.property_id == property_id)
+    elif city is not None:
+        query = query.where(func.lower(Property.city) == city.strip().lower())
+
+    grouped: dict[str, list[CompetitorRef]] = {}
+    for competitor_id, name, property_city in session.execute(query):
+        grouped.setdefault(property_city, []).append(
+            CompetitorRef(id=competitor_id, name=name)
+        )
+    return grouped
 
 
 class SupportsGet(Protocol):
