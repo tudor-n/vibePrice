@@ -35,6 +35,7 @@ from pricepilot.ingest.events import EventRecord, StaticSibiuEventSource, upsert
 from pricepilot.ingest.holidays import holiday_signal_records
 from pricepilot.ingest.signals import upsert_signals
 from pricepilot.ingest.weather import CITY_COORDS, fetch_weather_signals
+from pricepilot.places import PlaceCandidate, get_places_provider
 from pricepilot.scrapers.client import PoliteClient
 from pricepilot.scrapers.orchestrator import SupportsGet, competitors_by_city, scrape_city
 
@@ -485,6 +486,68 @@ def handle_generate_recommendations(session: Session, payload: dict[str, Any]) -
     return {"generated": len(rows), "skipped": skipped}
 
 
+#: How many search candidates to stash for the correction picker.
+PLACE_CANDIDATE_LIMIT = 5
+
+
+def handle_resolve_place(
+    session: Session,
+    payload: dict[str, Any],
+    *,
+    provider: Any = None,
+) -> dict[str, Any]:
+    """Resolve a property to a Google place; write geo/rating + candidates.
+
+    Idempotent: re-running re-resolves and overwrites. On a match, the top
+    result populates the place columns, the top ``PLACE_CANDIDATE_LIMIT`` are
+    stashed for the correction picker, and ``discover_competitors`` is enqueued.
+    On no match, the ``"__failed__"`` sentinel goes into ``place_candidates``
+    and ``place_resolved_at`` stays null (backend derives place_status='failed').
+    ``provider`` is injectable for tests; production uses ``get_places_provider()``.
+    """
+    property_id = _parse_uuid(payload.get("property_id"))
+    if property_id is None:
+        raise ValueError("resolve_place requires property_id")
+    prop = session.get(Property, property_id)
+    if prop is None:
+        return {"resolved": False, "reason": "property not found"}
+
+    query = (payload.get("query") or f"{prop.name}").strip()
+    active = provider if provider is not None else get_places_provider()
+    candidates: list[PlaceCandidate] = active.text_search(query, city=prop.city)
+
+    if not candidates:
+        session.execute(
+            update(Property).where(Property.id == property_id).values(
+                place_candidates="__failed__", place_resolved_at=None,
+            )
+        )
+        session.commit()
+        return {"resolved": False, "reason": f"no match for {query!r}"}
+
+    top = candidates[0]
+    stash = [c.to_dict() for c in candidates[:PLACE_CANDIDATE_LIMIT]]
+    session.execute(
+        update(Property).where(Property.id == property_id).values(
+            place_id=top.place_id,
+            latitude=top.latitude,
+            longitude=top.longitude,
+            rating=top.rating,
+            rating_count=top.rating_count,
+            place_resolved_at=func.now(),
+            place_candidates=stash,
+        )
+    )
+    enqueue_job(session, "discover_competitors", {"property_id": str(property_id)})
+    session.commit()
+    return {
+        "property_id": str(property_id),
+        "resolved": True,
+        "place_id": top.place_id,
+        "candidate_count": len(stash),
+    }
+
+
 Handler = Callable[[Session, dict[str, Any]], dict[str, Any]]
 
 HANDLERS: dict[str, Handler] = {
@@ -492,4 +555,5 @@ HANDLERS: dict[str, Handler] = {
     "ingest.events": handle_ingest_events,
     "ingest.demand_signals": handle_ingest_demand_signals,
     "engine.generate_recommendations": handle_generate_recommendations,
+    "resolve_place": handle_resolve_place,
 }
