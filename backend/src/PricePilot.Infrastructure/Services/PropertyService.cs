@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using PricePilot.Application;
 using PricePilot.Domain;
@@ -121,13 +122,22 @@ public sealed class PropertyService(AppDbContext db, ITenantContext tenantContex
         return new CompetitorDto(competitor.Id, competitor.Name, competitor.SourceUrl, []);
     }
 
-    private static PropertyDto ToDto(Property property, IEnumerable<RoomType> roomTypes) =>
-        new(
-            property.Id,
-            property.Name,
-            property.City,
-            property.Address,
-            roomTypes
-                .Select(rt => new RoomTypeDto(rt.Id, rt.Name, rt.Capacity, rt.BasePrice, rt.CurrentPrice, rt.Currency))
-                .ToList());
+    private static PropertyDto ToDto(Property property, IEnumerable<RoomType> roomTypes)
+    {
+        var status = property.PlaceResolvedAt is not null ? "resolved"
+            : property.PlaceCandidates is "__failed__" ? "failed"
+            : "unresolved";
+        var candidates = DeserializeCandidates(property.PlaceCandidates);
+        return new PropertyDto(
+            property.Id, property.Name, property.City, property.Address,
+            property.Latitude, property.Longitude, property.Rating, property.RatingCount,
+            status, candidates,
+            roomTypes.Select(rt => new RoomTypeDto(rt.Id, rt.Name, rt.Capacity, rt.BasePrice, rt.CurrentPrice, rt.Currency)).ToList());
+    }
+
+    private static IReadOnlyList<PlaceCandidateDto> DeserializeCandidates(string? json) =>
+        string.IsNullOrWhiteSpace(json) || json == "__failed__"
+            ? []
+            : JsonSerializer.Deserialize<List<PlaceCandidateDto>>(json,
+                new JsonSerializerOptions(JsonSerializerDefaults.Web)) ?? [];
 }

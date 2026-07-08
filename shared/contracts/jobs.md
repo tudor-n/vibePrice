@@ -16,6 +16,8 @@ in this table too, for observability from the dashboard.
 | `ingest.events` | `{"city": "sibiu"}` | Refresh events calendar for a city |
 | `ingest.demand_signals` | `{"city": "sibiu"}` | Refresh public stats/holidays/weather signals |
 | `engine.generate_recommendations` | `{"tenant_id": "<uuid>\|null", "property_id": "<uuid>\|null", "horizon_days": 90}` | Recompute recommendations; nulls mean "all" |
+| `resolve_place` | `{"property_id": "<uuid>"}` | Resolve a property to a Google place (text search), write place_id/geo/rating + top-5 candidates, then enqueue discover_competitors |
+| `discover_competitors` | `{"property_id": "<uuid>"}` | Nearby-search lodging around the resolved property; upsert competitor rows with Google data; skip the property's own place and tombstoned (excluded) rows |
 
 ## Row shape
 
@@ -83,6 +85,22 @@ missing from the dataplane's coordinate map. Signals upsert idempotently on
 (city, signal_type, signal_date); `created_at` refreshes on re-ingest (freshness
 marker). Signal types so far: `public_holiday` (value 1), `weather.temp_max_c`,
 `weather.precipitation_mm`.
+
+`resolve_place`:
+
+```json
+{"property_id": "...", "resolved": true, "place_id": "...", "candidate_count": 5}
+```
+
+or `{"resolved": false, "reason": "no match for '<query>'"}` when no candidate is found;
+the dataplane writes the `"__failed__"` sentinel to `place_candidates` in that case (see
+`shared/contracts/place-candidates.md`) and enqueues nothing further.
+
+`discover_competitors`:
+
+```json
+{"property_id": "...", "discovered": 4, "skipped_excluded": 1, "capped": 0}
+```
 
 ## Dashboard "Refresh data now"
 

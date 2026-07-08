@@ -13,11 +13,18 @@ public sealed record RoomTypeDto(
     decimal CurrentPrice,
     string Currency);
 
+public sealed record PlaceCandidateDto(
+    string PlaceId, string Name, string? FormattedAddress,
+    decimal? Latitude, decimal? Longitude, decimal? Rating, int? RatingCount);
+
 public sealed record PropertyDto(
     Guid Id,
     string Name,
     string City,
     string? Address,
+    decimal? Latitude, decimal? Longitude, decimal? Rating, int? RatingCount,
+    string PlaceStatus, // "unresolved" | "resolved" | "failed"
+    IReadOnlyList<PlaceCandidateDto> PlaceCandidates,
     IReadOnlyList<RoomTypeDto> RoomTypes);
 
 public sealed record PropertyCreateDto(string Name, string City, string? Address);

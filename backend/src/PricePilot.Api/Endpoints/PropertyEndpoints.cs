@@ -1,3 +1,4 @@
+using System.Text.Json;
 using PricePilot.Api.Auth;
 using PricePilot.Application;
 
@@ -15,6 +16,7 @@ public static class PropertyEndpoints
         group.MapPost("/", async (
             PropertyCreateDto dto,
             IPropertyService properties,
+            IJobDispatcher jobs,
             ITenantContext tenant,
             CancellationToken ct) =>
         {
@@ -29,6 +31,9 @@ public static class PropertyEndpoints
             }
 
             var created = await properties.CreateAsync(dto, ct);
+            using var payloadDoc = JsonDocument.Parse(
+                $$"""{"property_id":"{{created.Id}}"}""");
+            await jobs.EnqueueAsync(JobTypes.ResolvePlace, payloadDoc.RootElement.Clone(), requestedBy: null, ct);
             return Results.Created($"/api/v1/properties/{created.Id}", created);
         });
 

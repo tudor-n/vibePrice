@@ -51,7 +51,7 @@ paths:
                 type: array
                 items: { $ref: "#/components/schemas/Property" }
     post:
-      summary: Create a property
+      summary: Create a property. Enqueues a resolve_place job (see shared/contracts/jobs.md) so the new property is tied to a Google place asynchronously; the response reflects placeStatus "unresolved".
       requestBody:
         required: true
         content:
@@ -184,9 +184,30 @@ components:
         name: { type: string }
         city: { type: string }
         address: { type: string }
+        latitude: { type: number, nullable: true }
+        longitude: { type: number, nullable: true }
+        rating: { type: number, nullable: true }
+        ratingCount: { type: integer, nullable: true }
+        placeStatus:
+          type: string
+          enum: [unresolved, resolved, failed]
+          description: "Derived, not stored: resolved when placeResolvedAt is set, failed when the dataplane wrote the __failed__ sentinel, else unresolved. See shared/contracts/place-candidates.md."
+        placeCandidates:
+          type: array
+          items: { $ref: "#/components/schemas/PlaceCandidate" }
         roomTypes:
           type: array
           items: { $ref: "#/components/schemas/RoomType" }
+    PlaceCandidate:
+      type: object
+      properties:
+        placeId: { type: string }
+        name: { type: string }
+        formattedAddress: { type: string, nullable: true }
+        latitude: { type: number, nullable: true }
+        longitude: { type: number, nullable: true }
+        rating: { type: number, nullable: true }
+        ratingCount: { type: integer, nullable: true }
     PropertyCreate:
       type: object
       required: [name, city]
