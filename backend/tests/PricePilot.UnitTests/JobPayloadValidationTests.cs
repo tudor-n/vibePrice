@@ -166,6 +166,54 @@ public sealed class JobPayloadValidationTests : IDisposable
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Own_tenant_id_in_payload_is_accepted()
+    {
+        var response = await PostJobAsync(new
+        {
+            type = "engine.generate_recommendations",
+            payload = new { tenant_id = _tenantId, horizon_days = 90 },
+        });
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Foreign_tenant_id_in_payload_is_not_found()
+    {
+        // Trigger-only interference, but interference nonetheless: recomputing
+        // another tenant's recommendations must be impossible.
+        var response = await PostJobAsync(new
+        {
+            type = "engine.generate_recommendations",
+            payload = new { tenant_id = _otherTenantId, horizon_days = 90 },
+        });
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Unparseable_tenant_id_is_a_bad_request()
+    {
+        var response = await PostJobAsync(new
+        {
+            type = "engine.generate_recommendations",
+            payload = new { tenant_id = "not-a-guid" },
+        });
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("tenant_id", body);
+    }
+
+    [Fact]
+    public async Task Explicit_null_tenant_id_is_accepted()
+    {
+        var response = await PostJobAsync(new
+        {
+            type = "engine.generate_recommendations",
+            payload = new { tenant_id = (Guid?)null, horizon_days = 90 },
+        });
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+    }
+
     public void Dispose()
     {
         _factory.Dispose();

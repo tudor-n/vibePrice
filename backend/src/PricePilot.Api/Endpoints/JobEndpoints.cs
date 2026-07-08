@@ -17,6 +17,7 @@ public static class JobEndpoints
             JobCreateRequest request,
             IJobDispatcher jobs,
             IPropertyService properties,
+            ITenantContext tenantContext,
             ClaimsPrincipal user,
             CancellationToken ct) =>
         {
@@ -28,20 +29,38 @@ public static class JobEndpoints
                 });
             }
 
-            // A property_id in the payload must resolve through the tenant-filtered
-            // context: job payloads must never become a cross-tenant trigger channel.
-            if (request.Payload is { ValueKind: JsonValueKind.Object } payload
-                && payload.TryGetProperty("property_id", out var propertyIdElement)
-                && propertyIdElement.ValueKind != JsonValueKind.Null)
+            // Scope ids in the payload must belong to the caller: job payloads must
+            // never become a cross-tenant trigger channel. Mismatches answer 404,
+            // indistinguishable from a nonexistent id.
+            if (request.Payload is { ValueKind: JsonValueKind.Object } payload)
             {
-                if (propertyIdElement.ValueKind != JsonValueKind.String
-                    || !Guid.TryParse(propertyIdElement.GetString(), out var propertyId))
+                if (payload.TryGetProperty("property_id", out var propertyIdElement)
+                    && propertyIdElement.ValueKind != JsonValueKind.Null)
                 {
-                    return Results.BadRequest(new { error = "payload.property_id must be a UUID" });
+                    if (propertyIdElement.ValueKind != JsonValueKind.String
+                        || !Guid.TryParse(propertyIdElement.GetString(), out var propertyId))
+                    {
+                        return Results.BadRequest(new { error = "payload.property_id must be a UUID" });
+                    }
+                    if (!await properties.ExistsAsync(propertyId, ct))
+                    {
+                        return Results.NotFound(new { error = "property not found" });
+                    }
                 }
-                if (!await properties.ExistsAsync(propertyId, ct))
+
+                if (payload.TryGetProperty("tenant_id", out var tenantIdElement)
+                    && tenantIdElement.ValueKind != JsonValueKind.Null)
                 {
-                    return Results.NotFound(new { error = "property not found" });
+                    if (tenantIdElement.ValueKind != JsonValueKind.String
+                        || !Guid.TryParse(tenantIdElement.GetString(), out var payloadTenantId))
+                    {
+                        return Results.BadRequest(new { error = "payload.tenant_id must be a UUID" });
+                    }
+                    if (tenantContext.TenantId is not { } callerTenantId
+                        || payloadTenantId != callerTenantId)
+                    {
+                        return Results.NotFound(new { error = "tenant not found" });
+                    }
                 }
             }
 

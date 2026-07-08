@@ -95,6 +95,7 @@ def collect_source_observations(
     """
     outcome = SourceOutcome()
     matched_ever: set[Any] = set()
+    currency_mismatch_dates: dict[tuple[str, str], int] = {}
 
     for index, stay_date in enumerate(stay_dates):
         plan = scraper.plan_request(city, stay_date)
@@ -119,10 +120,8 @@ def collect_source_observations(
             # Name matching succeeded either way; currency decides persistence.
             matched_ever.add(competitor_id)
             if listing.currency != expected_currency:
-                outcome.issues.append(
-                    f"{stay_date}: currency mismatch {listing.currency} for "
-                    f"{listing.name!r}; observation dropped"
-                )
+                key = (listing.name, listing.currency)
+                currency_mismatch_dates[key] = currency_mismatch_dates.get(key, 0) + 1
                 continue
             outcome.observations.append(
                 RateObservation(
@@ -132,6 +131,14 @@ def collect_source_observations(
                     currency=listing.currency,
                 )
             )
+
+    # One aggregated line per offender, not one per date (90-day windows would
+    # otherwise flood scrape_runs.error with near-identical lines).
+    for (name, currency), count in sorted(currency_mismatch_dates.items()):
+        outcome.issues.append(
+            f"currency mismatch {currency} for {name!r} on {count} "
+            f"date{'s' if count != 1 else ''}; observations dropped"
+        )
 
     if outcome.dates_fetched:
         outcome.unmatched = [

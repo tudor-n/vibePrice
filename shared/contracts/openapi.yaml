@@ -152,6 +152,10 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Job" }
+        "400":
+          description: Unknown job type, or payload.property_id / payload.tenant_id is not a UUID
+        "404":
+          description: payload.property_id / payload.tenant_id does not belong to the caller's tenant (indistinguishable from a nonexistent id)
   /jobs/{jobId}:
     get:
       summary: Job status

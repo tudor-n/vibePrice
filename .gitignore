@@ -35,3 +35,7 @@ Thumbs.db
 # Logs & data dumps
 *.log
 data/
+
+# Raw live scraper captures (python -m pricepilot.scrapers.capture) — trim a
+# capture into a reviewed fixture before committing; never commit raw pages.
+dataplane/tests/fixtures/*_live.html
