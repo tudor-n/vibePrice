@@ -94,6 +94,77 @@ public sealed class PropertyResolveEnqueueTests : IDisposable
         Assert.Equal("unresolved", list!.Single().GetProperty("placeStatus").GetString());
     }
 
+    [Fact]
+    public async Task Get_properties_reports_resolved_and_deserializes_snake_case_candidates()
+    {
+        // place_candidates is stored as snake_case JSON (shared/contracts/place-candidates.md):
+        // place_id, name, formatted_address, latitude, longitude, rating, rating_count.
+        const string candidatesJson =
+            """
+            [{ "place_id": "ChIJabc", "name": "Hotel Continental Forum",
+               "formatted_address": "Piata Unirii 10, Sibiu",
+               "latitude": 45.798300, "longitude": 24.125600,
+               "rating": 4.4, "rating_count": 1280 }]
+            """;
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.Properties.Add(new Property
+            {
+                Id = Guid.NewGuid(),
+                TenantId = _tenantId,
+                Name = "Hotel Continental Forum",
+                City = "sibiu",
+                PlaceId = "ChIJabc",
+                Latitude = 45.798300m,
+                Longitude = 24.125600m,
+                Rating = 4.4m,
+                RatingCount = 1280,
+                PlaceResolvedAt = DateTimeOffset.UtcNow,
+                PlaceCandidates = candidatesJson,
+                CreatedAt = DateTimeOffset.UtcNow,
+            });
+            db.SaveChanges();
+        }
+
+        var client = CreateTenantClient();
+        var list = await client.GetFromJsonAsync<List<JsonElement>>("/api/v1/properties");
+        var property = list!.Single();
+
+        Assert.Equal("resolved", property.GetProperty("placeStatus").GetString());
+        var candidate = property.GetProperty("placeCandidates").EnumerateArray().Single();
+        Assert.Equal("ChIJabc", candidate.GetProperty("placeId").GetString());
+        Assert.Equal("Piata Unirii 10, Sibiu", candidate.GetProperty("formattedAddress").GetString());
+        Assert.Equal(1280, candidate.GetProperty("ratingCount").GetInt32());
+    }
+
+    [Fact]
+    public async Task Get_properties_reports_failed_for_the_failed_sentinel()
+    {
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.Properties.Add(new Property
+            {
+                Id = Guid.NewGuid(),
+                TenantId = _tenantId,
+                Name = "Hotel Nowhere",
+                City = "sibiu",
+                PlaceCandidates = "__failed__",
+                CreatedAt = DateTimeOffset.UtcNow,
+            });
+            db.SaveChanges();
+        }
+
+        var client = CreateTenantClient();
+        var list = await client.GetFromJsonAsync<List<JsonElement>>("/api/v1/properties");
+        var property = list!.Single();
+
+        Assert.Equal("failed", property.GetProperty("placeStatus").GetString());
+        Assert.Empty(property.GetProperty("placeCandidates").EnumerateArray());
+    }
+
     public void Dispose()
     {
         _factory.Dispose();

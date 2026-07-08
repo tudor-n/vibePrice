@@ -135,9 +135,16 @@ public sealed class PropertyService(AppDbContext db, ITenantContext tenantContex
             roomTypes.Select(rt => new RoomTypeDto(rt.Id, rt.Name, rt.Capacity, rt.BasePrice, rt.CurrentPrice, rt.Currency)).ToList());
     }
 
+    // place_candidates stores snake_case keys (place_id, formatted_address, rating_count) per
+    // shared/contracts/place-candidates.md — the dataplane writes that shape. Map snake_case in;
+    // ASP.NET still serializes PlaceCandidateDto OUT as camelCase to the web client.
+    private static readonly JsonSerializerOptions CandidateJsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+    };
+
     private static IReadOnlyList<PlaceCandidateDto> DeserializeCandidates(string? json) =>
         string.IsNullOrWhiteSpace(json) || json == "__failed__"
             ? []
-            : JsonSerializer.Deserialize<List<PlaceCandidateDto>>(json,
-                new JsonSerializerOptions(JsonSerializerDefaults.Web)) ?? [];
+            : JsonSerializer.Deserialize<List<PlaceCandidateDto>>(json, CandidateJsonOptions) ?? [];
 }
