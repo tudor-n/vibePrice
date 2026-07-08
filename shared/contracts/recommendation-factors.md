@@ -10,7 +10,7 @@ verbatim). Backend treats it as opaque JSON.
 
 ```json
 {
-  "engine_version": "1",
+  "engine_version": "2",
   "base_price": 350.00,
   "currency": "RON",
   "factors": [
@@ -29,7 +29,9 @@ verbatim). Backend treats it as opaque JSON.
       "rule": "competitor_position",
       "adjustment_pct": 3.0,
       "reason": "8 of 10 tracked competitors raised prices ~15% for these dates.",
-      "sample_size": 10
+      "sample_size": 10,
+      "band_low": 380.00,
+      "band_high": 455.00
     },
     {
       "rule": "day_of_week",
@@ -63,3 +65,12 @@ Rules:
 - `recommended_price` = `base_price` × Π(1 + adjustment_pct/100), rounded per currency rules
   (RON: whole numbers, psychological rounding allowed but must round DOWN, never above the computed cap).
 - Bump `engine_version` on any shape change and keep the dashboard renderer backward-compatible.
+- `competitor_position.band_low` / `band_high` (v2+): the min/max of the competitor
+  rates used for that stay date, present **iff** `sample_size > 0`. Consumers must
+  tolerate their absence (v1 rows persist in the DB) — the dashboard hides the band
+  then. These are server-computed truth: the web layer never derives money figures.
+
+## Changelog
+
+- `"2"` (2026-07-08): `competitor_position` factor gains `band_low`/`band_high`.
+- `"1"` (2026-07-04): initial shape.
