@@ -41,11 +41,34 @@ export interface RoomType {
   currency: string;
 }
 
+/**
+ * Derived server-side from `placeResolvedAt` / the `place_candidates`
+ * sentinel — never stored directly. See shared/contracts/place-candidates.md.
+ */
+export type PlaceStatus = 'unresolved' | 'resolved' | 'failed';
+
+/** A single Google Places search result, stored for the correction UI. */
+export interface PlaceCandidate {
+  placeId: string;
+  name: string;
+  formattedAddress?: string;
+  latitude?: number;
+  longitude?: number;
+  rating?: number;
+  ratingCount?: number;
+}
+
 export interface Property {
   id: string;
   name: string;
   city: string;
   address?: string;
+  latitude?: number;
+  longitude?: number;
+  rating?: number;
+  ratingCount?: number;
+  placeStatus: PlaceStatus;
+  placeCandidates: PlaceCandidate[];
   roomTypes: RoomType[];
 }
 
@@ -53,6 +76,16 @@ export interface PropertyCreate {
   name: string;
   city: string;
   address?: string;
+}
+
+/** PATCH /properties/{id}/place — owner picks a stored candidate. */
+export interface PlacePick {
+  placeId: string;
+}
+
+/** POST /properties/{id}/resolve-place — owner-triggered re-search. */
+export interface ResolvePlace {
+  query?: string;
 }
 
 export type RecommendationStatus = 'pending' | 'accepted' | 'dismissed';
@@ -81,14 +114,13 @@ export interface CompetitorRate {
 export interface Competitor {
   id: string;
   name: string;
-  sourceUrl: string;
+  /** OTA listing URL; absent for some auto-discovered places. */
+  sourceUrl?: string;
+  rating?: number;
+  ratingCount?: number;
+  latitude?: number;
+  longitude?: number;
   latestRates: CompetitorRate[];
-}
-
-export interface CompetitorCreate {
-  name: string;
-  /** OTA listing URL to scrape. */
-  sourceUrl: string;
 }
 
 export interface EventItem {
