@@ -7,6 +7,7 @@ re-running a succeeded job is always safe.
 """
 
 import logging
+import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, timedelta
@@ -14,6 +15,7 @@ from typing import Any
 from uuid import UUID
 
 from sqlalchemy import delete, func, insert, select, text, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from pricepilot.config import get_settings
@@ -548,6 +550,97 @@ def handle_resolve_place(
     }
 
 
+#: Namespace for deterministic competitor ids derived from a Google place_id.
+DISCOVERY_NS = uuid.UUID("6f9619ff-8b86-d011-b42d-00cf4fc964ff")
+
+
+def handle_discover_competitors(
+    session: Session,
+    payload: dict[str, Any],
+    *,
+    provider: Any = None,
+) -> dict[str, Any]:
+    """Auto-discover nearby lodging competitors from a resolved property.
+
+    Idempotent: each competitor's id is ``uuid5(DISCOVERY_NS, place_id)`` so a
+    re-run updates in place. The property's own place is skipped; any place
+    whose competitor row is tombstoned (``excluded_at`` set) is left removed —
+    the owner's untrack is permanent. Capped at
+    ``settings.competitor_discovery_max`` (overflow logged, never silently
+    dropped). No-op with a reason if the property is unresolved.
+    """
+    settings = get_settings()
+    property_id = _parse_uuid(payload.get("property_id"))
+    prop = session.get(Property, property_id) if property_id else None
+    if prop is None:
+        return {"discovered": 0, "reason": "property not found"}
+    if prop.latitude is None or prop.longitude is None:
+        return {"discovered": 0, "reason": "property not resolved (no coordinates)"}
+
+    active = provider if provider is not None else get_places_provider()
+    found: list[PlaceCandidate] = active.nearby(
+        prop.latitude, prop.longitude,
+        radius_m=settings.competitor_discovery_radius_m, kind="lodging",
+    )
+
+    # Existing rows for this property, keyed by place_id, to honor tombstones.
+    existing = {
+        c.place_id: c
+        for c in session.execute(
+            select(Competitor).where(Competitor.property_id == prop.id)
+        ).scalars()
+        if c.place_id is not None
+    }
+
+    discovered = skipped_excluded = capped = 0
+    for candidate in found:
+        if candidate.place_id == prop.place_id:
+            continue  # never track yourself
+        row = existing.get(candidate.place_id)
+        if row is not None and row.excluded_at is not None:
+            skipped_excluded += 1
+            continue  # tombstoned: owner's removal is permanent
+        if row is None and discovered >= settings.competitor_discovery_max:
+            capped += 1
+            continue
+        cid = uuid.uuid5(DISCOVERY_NS, candidate.place_id)
+        session.execute(
+            pg_insert(Competitor)
+            .values(
+                id=cid, tenant_id=prop.tenant_id, property_id=prop.id,
+                name=candidate.name, source_url=None,
+                place_id=candidate.place_id,
+                latitude=candidate.latitude, longitude=candidate.longitude,
+                rating=candidate.rating, rating_count=candidate.rating_count,
+                discovered_at=func.now(), discovery_source="google_nearby",
+                created_at=func.now(),
+            )
+            .on_conflict_do_update(
+                index_elements=[Competitor.id],
+                set_={
+                    "name": candidate.name,
+                    "latitude": candidate.latitude,
+                    "longitude": candidate.longitude,
+                    "rating": candidate.rating,
+                    "rating_count": candidate.rating_count,
+                    "discovered_at": func.now(),
+                },
+            )
+        )
+        if row is None:
+            discovered += 1
+    if capped:
+        logger.info(
+            "discover_competitors: capped %d beyond max=%d for property %s",
+            capped, settings.competitor_discovery_max, prop.id,
+        )
+    session.commit()
+    return {
+        "property_id": str(prop.id), "discovered": discovered,
+        "skipped_excluded": skipped_excluded, "capped": capped,
+    }
+
+
 Handler = Callable[[Session, dict[str, Any]], dict[str, Any]]
 
 HANDLERS: dict[str, Handler] = {
@@ -556,4 +649,5 @@ HANDLERS: dict[str, Handler] = {
     "ingest.demand_signals": handle_ingest_demand_signals,
     "engine.generate_recommendations": handle_generate_recommendations,
     "resolve_place": handle_resolve_place,
+    "discover_competitors": handle_discover_competitors,
 }
