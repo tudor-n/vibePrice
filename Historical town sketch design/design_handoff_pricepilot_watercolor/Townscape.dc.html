@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+  @keyframes bird-fly-a { 0% { transform: translate(0px,0px) rotate(0deg); opacity: 0; } 8% { opacity: .6; } 28% { transform: translate(150px,-26px) rotate(-6deg); } 52% { transform: translate(290px,-6px) rotate(5deg); } 78% { transform: translate(430px,-44px) rotate(-4deg); opacity: .6; } 100% { transform: translate(560px,-96px) rotate(-9deg); opacity: 0; } }
+  @keyframes bird-fly-b { 0% { transform: translate(0px,0px) rotate(0deg); opacity: 0; } 10% { opacity: .55; } 32% { transform: translate(175px,-12px) rotate(5deg); } 58% { transform: translate(330px,-32px) rotate(-5deg); } 82% { transform: translate(470px,-8px) rotate(4deg); opacity: .55; } 100% { transform: translate(610px,-60px) rotate(6deg); opacity: 0; } }
+  @keyframes bird-fly-c { 0% { transform: translate(0px,0px) rotate(0deg); opacity: 0; } 9% { opacity: .5; } 30% { transform: translate(140px,-36px) rotate(-5deg); } 56% { transform: translate(300px,-14px) rotate(6deg); } 84% { transform: translate(430px,-58px) rotate(-5deg); opacity: .5; } 100% { transform: translate(520px,-120px) rotate(-10deg); opacity: 0; } }
+  @keyframes bird-flap-l { 0%,100% { transform: rotate(-14deg); } 44% { transform: rotate(16deg); } }
+  @keyframes bird-flap-r { 0%,100% { transform: rotate(14deg); } 44% { transform: rotate(-16deg); } }
+  @keyframes cloud-drift-a { 0% { transform: translateX(0); } 100% { transform: translateX(34px); } }
+  @keyframes cloud-drift-b { 0% { transform: translateX(0); } 100% { transform: translateX(-28px); } }
+</style>
+</helmet>
+<sc-if value="{{ isHero }}" hint-placeholder-val="{{ true }}">
+<svg viewBox="0 0 1000 720" width="100%" height="100%" preserveAspectRatio="xMidYMax slice" role="img" aria-label="Watercolor illustration of an old European town" style="display:block">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#c9d2da"/>
+      <stop offset="0.3" stop-color="#e4c6b6"/>
+      <stop offset="0.55" stop-color="#f2c89e"/>
+      <stop offset="0.78" stop-color="#f8daa4"/>
+      <stop offset="1" stop-color="#f6e6c6"/>
+    </linearGradient>
+    <radialGradient id="sunGlow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ffe9b0" stop-opacity="0.9"/>
+      <stop offset="0.35" stop-color="#f7cf88" stop-opacity="0.5"/>
+      <stop offset="0.7" stop-color="#f2b978" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#f2b978" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="sunCore" cx="0.5" cy="0.45" r="0.62">
+      <stop offset="0" stop-color="#fff6db"/>
+      <stop offset="0.45" stop-color="#fbe0a0" stop-opacity="0.85"/>
+      <stop offset="0.8" stop-color="#f4c874" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#f4c874" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="cloudGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff9f0"/>
+      <stop offset="1" stop-color="#f0cfa6"/>
+    </linearGradient>
+    <linearGradient id="horizon" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f8d9a0" stop-opacity="0"/>
+      <stop offset="1" stop-color="#f6cf94" stop-opacity="0.55"/>
+    </linearGradient>
+    <filter id="wc" x="-8%" y="-8%" width="116%" height="116%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.012 0.016" numOctaves="3" seed="7" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="9" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <filter id="ink" x="-8%" y="-8%" width="116%" height="116%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.02 0.03" numOctaves="2" seed="3" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="4" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <filter id="soft"><feGaussianBlur stdDeviation="7"/></filter>
+    <filter id="grain"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" stitchTiles="stitch" result="n"/><feColorMatrix in="n" type="saturate" values="0"/></filter>
+  </defs>
+
+  <rect x="0" y="0" width="1000" height="720" fill="url(#sky)"/>
+  <rect x="0" y="360" width="1000" height="360" fill="url(#horizon)"/>
+
+  <!-- setting sun, low over the rooftops (soft watercolor) -->
+  <circle cx="772" cy="300" r="320" fill="url(#sunGlow)"/>
+  <g stroke="#ffe6ad" stroke-opacity="0.13" stroke-width="10" stroke-linecap="round" filter="url(#soft)">
+    <line x1="772" y1="300" x2="520" y2="150"/>
+    <line x1="772" y1="300" x2="730" y2="70"/>
+    <line x1="772" y1="300" x2="965" y2="120"/>
+  </g>
+  <g filter="url(#wc)">
+    <circle cx="772" cy="300" r="66" fill="url(#sunCore)"/>
+  </g>
+  <circle cx="772" cy="300" r="72" fill="#f6d99c" opacity="0.45" filter="url(#soft)"/>
+  <circle cx="770" cy="298" r="34" fill="#fff6da" opacity="0.7" filter="url(#soft)"/>
+
+  <!-- sunset-lit clouds, slow drift -->
+  <g opacity="0.92">
+    <g filter="url(#soft)" style="animation:cloud-drift-a 46s ease-in-out infinite alternate;">
+      <ellipse cx="210" cy="134" rx="150" ry="11" fill="#e6b489" opacity="0.4"/>
+      <g fill="url(#cloudGrad)">
+        <ellipse cx="150" cy="132" rx="60" ry="18"/>
+        <ellipse cx="280" cy="134" rx="64" ry="18"/>
+        <ellipse cx="210" cy="120" rx="96" ry="26"/>
+      </g>
+    </g>
+    <g filter="url(#soft)" style="animation:cloud-drift-b 62s ease-in-out infinite alternate;">
+      <ellipse cx="560" cy="104" rx="128" ry="9" fill="#e6b489" opacity="0.34"/>
+      <g fill="url(#cloudGrad)">
+        <ellipse cx="510" cy="102" rx="52" ry="15"/>
+        <ellipse cx="615" cy="102" rx="54" ry="15"/>
+        <ellipse cx="560" cy="92" rx="86" ry="22"/>
+      </g>
+    </g>
+    <g filter="url(#soft)" style="animation:cloud-drift-a 54s ease-in-out infinite alternate 3s;">
+      <ellipse cx="896" cy="160" rx="104" ry="7" fill="#e2ad82" opacity="0.32"/>
+      <g fill="url(#cloudGrad)">
+        <ellipse cx="860" cy="160" rx="44" ry="13"/>
+        <ellipse cx="900" cy="150" rx="70" ry="19"/>
+      </g>
+    </g>
+  </g>
+
+  <!-- distant faint back row for depth -->
+  <g fill="#cdb9d0" opacity="0.35" filter="url(#wc)">
+    <rect x="60" y="420" width="90" height="220"/>
+    <rect x="150" y="380" width="70" height="260"/>
+    <rect x="470" y="400" width="100" height="240"/>
+    <rect x="700" y="430" width="80" height="210"/>
+    <rect x="860" y="400" width="90" height="240"/>
+  </g>
+
+  <!-- ===== main building row ===== -->
+  <!-- B1 sage -->
+  <g filter="url(#wc)">
+    <rect x="30" y="380" width="130" height="260" fill="#9fbc9b" opacity="0.92"/>
+    <polygon points="20,382 95,320 170,382" fill="#6f9a86" opacity="0.95"/>
+  </g>
+  <!-- B2 terracotta gabled -->
+  <g filter="url(#wc)">
+    <rect x="150" y="330" width="120" height="310" fill="#d98c6a" opacity="0.92"/>
+    <polygon points="150,332 210,270 270,332" fill="#b5654a" opacity="0.95"/>
+    <path d="M195 270 q15 -26 30 0 z" fill="#b5654a"/>
+  </g>
+  <!-- B3 cream small -->
+  <g filter="url(#wc)">
+    <rect x="262" y="420" width="86" height="220" fill="#ede0c6" opacity="0.94"/>
+    <polygon points="256,422 305,378 354,422" fill="#c9a06a" opacity="0.95"/>
+  </g>
+  <!-- Church spire -->
+  <g filter="url(#wc)">
+    <rect x="352" y="300" width="120" height="340" fill="#ecdfc4" opacity="0.95"/>
+    <polygon points="352,302 412,150 472,302" fill="#3f6f6a" opacity="0.95"/>
+    <rect x="398" y="360" width="28" height="60" rx="14" fill="#3f6f6a" opacity="0.85"/>
+  </g>
+  <!-- B5 dusty blue mansard -->
+  <g filter="url(#wc)">
+    <rect x="470" y="352" width="140" height="288" fill="#9fc0d6" opacity="0.9"/>
+    <path d="M462 354 h156 l-24 -54 h-108 z" fill="#5e88a6" opacity="0.95"/>
+  </g>
+  <!-- B6 rose -->
+  <g filter="url(#wc)">
+    <rect x="608" y="400" width="104" height="240" fill="#d9a79f" opacity="0.92"/>
+    <polygon points="600,402 660,352 720,402" fill="#b47d76" opacity="0.95"/>
+  </g>
+  <!-- B7 ochre tall -->
+  <g filter="url(#wc)">
+    <rect x="710" y="336" width="120" height="304" fill="#e0b25e" opacity="0.9"/>
+    <polygon points="702,338 770,282 838,338" fill="#c98a3c" opacity="0.95"/>
+  </g>
+  <!-- B8 cream/terracotta -->
+  <g filter="url(#wc)">
+    <rect x="828" y="392" width="132" height="248" fill="#e7d9bd" opacity="0.94"/>
+    <polygon points="820,394 894,344 968,394" fill="#b5654a" opacity="0.92"/>
+  </g>
+
+  <!-- ink outlines & windows -->
+  <g filter="url(#ink)" fill="none" stroke="#4a3b2f" stroke-width="2.1" stroke-opacity="0.62" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="30" y="380" width="130" height="260"/><polyline points="20,382 95,320 170,382"/>
+    <rect x="150" y="330" width="120" height="310"/><polyline points="150,332 210,270 270,332"/>
+    <rect x="262" y="420" width="86" height="220"/><polyline points="256,422 305,378 354,422"/>
+    <rect x="352" y="300" width="120" height="340"/><polyline points="352,302 412,150 472,302"/>
+    <rect x="470" y="352" width="140" height="288"/><path d="M462 354 h156 l-24 -54 h-108 z"/>
+    <rect x="608" y="400" width="104" height="240"/><polyline points="600,402 660,352 720,402"/>
+    <rect x="710" y="336" width="120" height="304"/><polyline points="702,338 770,282 838,338"/>
+    <rect x="828" y="392" width="132" height="248"/><polyline points="820,394 894,344 968,394"/>
+    <line x1="412" y1="150" x2="412" y2="130"/><line x1="404" y1="138" x2="420" y2="138"/>
+  </g>
+
+  <!-- window glow + frames -->
+  <g filter="url(#ink)">
+    <g fill="#f6e2b0" fill-opacity="0.85" stroke="#4a3b2f" stroke-opacity="0.55" stroke-width="1.6">
+      <rect x="58" y="430" width="30" height="42" rx="3"/><rect x="104" y="430" width="30" height="42" rx="3"/>
+      <rect x="58" y="500" width="30" height="42" rx="3"/><rect x="104" y="500" width="30" height="42" rx="3"/>
+      <rect x="178" y="372" width="30" height="44" rx="3"/><rect x="214" y="372" width="30" height="44" rx="3"/>
+      <rect x="178" y="446" width="30" height="44" rx="3"/><rect x="214" y="446" width="30" height="44" rx="3"/>
+      <rect x="284" y="456" width="26" height="40" rx="3"/><rect x="300" y="524" width="26" height="40" rx="3"/>
+      <path d="M392 360 h40 v34 a20 20 0 0 1 -40 0 z"/>
+      <rect x="500" y="392" width="30" height="46" rx="3"/><rect x="548" y="392" width="30" height="46" rx="3"/>
+      <rect x="500" y="470" width="30" height="46" rx="3"/><rect x="548" y="470" width="30" height="46" rx="3"/>
+      <rect x="632" y="440" width="26" height="40" rx="3"/><rect x="664" y="440" width="26" height="40" rx="3"/>
+      <rect x="736" y="378" width="30" height="46" rx="3"/><rect x="784" y="378" width="30" height="46" rx="3"/>
+      <rect x="736" y="456" width="30" height="46" rx="3"/><rect x="784" y="456" width="30" height="46" rx="3"/>
+      <rect x="856" y="432" width="30" height="44" rx="3"/><rect x="902" y="432" width="30" height="44" rx="3"/>
+    </g>
+  </g>
+
+  <!-- birds: hand-drawn, natural wavy flight + independent wing flap -->
+  <g stroke="#5a4a3a" stroke-width="2" fill="none" stroke-linecap="round">
+    <g transform="translate(95,220)"><g style="animation:bird-fly-a 15s ease-in-out infinite;">
+      <g style="transform-box:fill-box;transform-origin:100% 100%;animation:bird-flap-l 0.5s ease-in-out infinite;"><path d="M0 0 Q-8 -9 -17 -3"/></g>
+      <g style="transform-box:fill-box;transform-origin:0% 100%;animation:bird-flap-r 0.5s ease-in-out infinite;"><path d="M0 0 Q8 -9 17 -3"/></g>
+    </g></g>
+    <g transform="translate(150,255) scale(0.82)"><g style="animation:bird-fly-b 19s ease-in-out infinite 1.4s;">
+      <g style="transform-box:fill-box;transform-origin:100% 100%;animation:bird-flap-l 0.58s ease-in-out infinite;"><path d="M0 0 Q-8 -9 -17 -3"/></g>
+      <g style="transform-box:fill-box;transform-origin:0% 100%;animation:bird-flap-r 0.58s ease-in-out infinite;"><path d="M0 0 Q8 -9 17 -3"/></g>
+    </g></g>
+    <g transform="translate(62,188) scale(0.7)"><g style="animation:bird-fly-c 23s ease-in-out infinite 4s;">
+      <g style="transform-box:fill-box;transform-origin:100% 100%;animation:bird-flap-l 0.64s ease-in-out infinite;"><path d="M0 0 Q-8 -9 -17 -3"/></g>
+      <g style="transform-box:fill-box;transform-origin:0% 100%;animation:bird-flap-r 0.64s ease-in-out infinite;"><path d="M0 0 Q8 -9 17 -3"/></g>
+    </g></g>
+  </g>
+
+  <!-- foreground cobble wash -->
+  <rect x="0" y="632" width="1000" height="88" fill="#cbb596" opacity="0.55" filter="url(#wc)"/>
+  <rect x="0" y="632" width="1000" height="12" fill="#8a7457" opacity="0.35"/>
+
+  <!-- ===== added detail: bunting, doors, clock, tree, lamp, shading, cobbles ===== -->
+  <!-- festive bunting swags -->
+  <g stroke="#5a4a3a" stroke-width="1.8" fill="none" opacity="0.55" filter="url(#ink)">
+    <path d="M150 300 Q310 358 470 300"/>
+    <path d="M470 300 Q650 358 830 300"/>
+  </g>
+  <g filter="url(#ink)" opacity="0.92">
+    <polygon points="206,319 222,319 214,339" fill="#c96f4a"/>
+    <polygon points="270,329 286,329 278,349" fill="#e0b25e"/>
+    <polygon points="302,330 318,330 310,350" fill="#6f9a86"/>
+    <polygon points="334,329 350,329 342,349" fill="#5e88a6"/>
+    <polygon points="398,319 414,319 406,339" fill="#d9a79f"/>
+    <polygon points="534,319 550,319 542,339" fill="#e0b25e"/>
+    <polygon points="606,329 622,329 614,349" fill="#c96f4a"/>
+    <polygon points="642,330 658,330 650,350" fill="#5e88a6"/>
+    <polygon points="678,329 694,329 686,349" fill="#6f9a86"/>
+    <polygon points="750,319 766,319 758,339" fill="#d9a79f"/>
+  </g>
+
+  <!-- church clock -->
+  <g filter="url(#ink)">
+    <circle cx="412" cy="348" r="16" fill="#fdf3d8" stroke="#4a3b2f" stroke-width="1.7" stroke-opacity="0.6"/>
+    <line x1="412" y1="348" x2="412" y2="338" stroke="#4a3b2f" stroke-width="1.5" stroke-opacity="0.7" stroke-linecap="round"/>
+    <line x1="412" y1="348" x2="420" y2="351" stroke="#4a3b2f" stroke-width="1.5" stroke-opacity="0.7" stroke-linecap="round"/>
+  </g>
+
+  <!-- chimney + smoke -->
+  <g filter="url(#ink)">
+    <rect x="234" y="290" width="15" height="24" fill="#b5654a" stroke="#4a3b2f" stroke-width="1.3" stroke-opacity="0.5"/>
+    <path d="M242 288 q-11 -12 2 -22 q11 -8 0 -20" fill="none" stroke="#c3b6a6" stroke-width="3" stroke-linecap="round" opacity="0.55"/>
+  </g>
+
+  <!-- soft cross-hatch shading on right edges -->
+  <g stroke="#4a3b2f" stroke-width="1.1" stroke-opacity="0.13" filter="url(#ink)">
+    <line x1="250" y1="360" x2="250" y2="620"/><line x1="256" y1="360" x2="256" y2="620"/>
+    <line x1="596" y1="430" x2="596" y2="620"/><line x1="602" y1="430" x2="602" y2="620"/>
+    <line x1="816" y1="372" x2="816" y2="620"/><line x1="822" y1="372" x2="822" y2="620"/>
+  </g>
+
+  <!-- doors -->
+  <g filter="url(#ink)">
+    <path d="M80 640 v-38 a14 14 0 0 1 28 0 v38 z" fill="#6d8f6a" stroke="#4a3b2f" stroke-width="1.5" stroke-opacity="0.55"/>
+    <path d="M196 640 v-40 a15 15 0 0 1 30 0 v40 z" fill="#8a5a3c" stroke="#4a3b2f" stroke-width="1.5" stroke-opacity="0.55"/>
+    <path d="M292 640 v-32 a12 12 0 0 1 24 0 v32 z" fill="#6f9a86" stroke="#4a3b2f" stroke-width="1.5" stroke-opacity="0.55"/>
+    <path d="M400 640 v-48 a16 16 0 0 1 32 0 v48 z" fill="#7a4f34" stroke="#4a3b2f" stroke-width="1.5" stroke-opacity="0.55"/>
+    <path d="M524 640 v-42 a16 16 0 0 1 32 0 v42 z" fill="#5e88a6" stroke="#4a3b2f" stroke-width="1.5" stroke-opacity="0.55"/>
+    <path d="M646 640 v-34 a12 12 0 0 1 24 0 v34 z" fill="#a86f68" stroke="#4a3b2f" stroke-width="1.5" stroke-opacity="0.55"/>
+    <path d="M756 640 v-40 a15 15 0 0 1 30 0 v40 z" fill="#c98a3c" stroke="#4a3b2f" stroke-width="1.5" stroke-opacity="0.55"/>
+    <path d="M878 640 v-38 a14 14 0 0 1 28 0 v38 z" fill="#b5654a" stroke="#4a3b2f" stroke-width="1.5" stroke-opacity="0.55"/>
+  </g>
+  <!-- door knobs + arched door lintels -->
+  <g fill="#3b3229" fill-opacity="0.5" filter="url(#ink)">
+    <circle cx="101" cy="622" r="2.2"/><circle cx="219" cy="620" r="2.3"/><circle cx="309" cy="623" r="2"/><circle cx="425" cy="619" r="2.4"/>
+    <circle cx="547" cy="620" r="2.3"/><circle cx="663" cy="623" r="2"/><circle cx="779" cy="620" r="2.3"/><circle cx="899" cy="622" r="2.2"/>
+  </g>
+
+  <!-- foreground cobble wash (moved above ground for depth) -->
+  <rect x="0" y="632" width="1000" height="88" fill="#cbb596" opacity="0.5" filter="url(#wc)"/>
+
+  <!-- little tree, left -->
+  <g filter="url(#wc)">
+    <rect x="24" y="600" width="9" height="42" fill="#8a6a4a"/>
+    <circle cx="28" cy="588" r="33" fill="#8ba888" opacity="0.9"/>
+    <circle cx="10" cy="600" r="21" fill="#799a79" opacity="0.85"/>
+    <circle cx="46" cy="602" r="21" fill="#9cb995" opacity="0.85"/>
+  </g>
+
+  <!-- lamppost -->
+  <g filter="url(#ink)" stroke="#3b3229" stroke-opacity="0.68" stroke-width="2.3" fill="none" stroke-linecap="round">
+    <line x1="452" y1="642" x2="452" y2="560"/>
+    <path d="M452 564 h18"/>
+    <rect x="463" y="552" width="14" height="16" rx="3" fill="#f6e2b0" fill-opacity="0.85"/>
+  </g>
+
+  <!-- cobblestone street -->
+  <rect x="0" y="632" width="1000" height="6" fill="#d8c8a8" opacity="0.5"/>
+  <g stroke="#8a7457" stroke-opacity="0.4" stroke-width="1" filter="url(#ink)">
+    <ellipse cx="-12" cy="656" rx="11" ry="6" fill="#c2b49c"/><ellipse cx="21" cy="656" rx="11" ry="6" fill="#b3a58d"/><ellipse cx="54" cy="656" rx="11" ry="6" fill="#c9bca6"/><ellipse cx="87" cy="656" rx="11" ry="6" fill="#ab9d86"/><ellipse cx="120" cy="656" rx="11" ry="6" fill="#bcaf98"/><ellipse cx="153" cy="656" rx="11" ry="6" fill="#c2b49c"/><ellipse cx="186" cy="656" rx="11" ry="6" fill="#b3a58d"/><ellipse cx="219" cy="656" rx="11" ry="6" fill="#c9bca6"/><ellipse cx="252" cy="656" rx="11" ry="6" fill="#ab9d86"/><ellipse cx="285" cy="656" rx="11" ry="6" fill="#bcaf98"/><ellipse cx="318" cy="656" rx="11" ry="6" fill="#c2b49c"/><ellipse cx="351" cy="656" rx="11" ry="6" fill="#b3a58d"/><ellipse cx="384" cy="656" rx="11" ry="6" fill="#c9bca6"/><ellipse cx="417" cy="656" rx="11" ry="6" fill="#ab9d86"/><ellipse cx="450" cy="656" rx="11" ry="6" fill="#bcaf98"/><ellipse cx="483" cy="656" rx="11" ry="6" fill="#c2b49c"/><ellipse cx="516" cy="656" rx="11" ry="6" fill="#b3a58d"/><ellipse cx="549" cy="656" rx="11" ry="6" fill="#c9bca6"/><ellipse cx="582" cy="656" rx="11" ry="6" fill="#ab9d86"/><ellipse cx="615" cy="656" rx="11" ry="6" fill="#bcaf98"/><ellipse cx="648" cy="656" rx="11" ry="6" fill="#c2b49c"/><ellipse cx="681" cy="656" rx="11" ry="6" fill="#b3a58d"/><ellipse cx="714" cy="656" rx="11" ry="6" fill="#c9bca6"/><ellipse cx="747" cy="656" rx="11" ry="6" fill="#ab9d86"/><ellipse cx="780" cy="656" rx="11" ry="6" fill="#bcaf98"/><ellipse cx="813" cy="656" rx="11" ry="6" fill="#c2b49c"/><ellipse cx="846" cy="656" rx="11" ry="6" fill="#b3a58d"/><ellipse cx="879" cy="656" rx="11" ry="6" fill="#c9bca6"/><ellipse cx="912" cy="656" rx="11" ry="6" fill="#ab9d86"/><ellipse cx="945" cy="656" rx="11" ry="6" fill="#bcaf98"/><ellipse cx="978" cy="656" rx="11" ry="6" fill="#c2b49c"/><ellipse cx="1011" cy="656" rx="11" ry="6" fill="#b3a58d"/>
+    <ellipse cx="8" cy="675" rx="13" ry="7" fill="#b3a58d"/><ellipse cx="47" cy="675" rx="13" ry="7" fill="#c9bca6"/><ellipse cx="86" cy="675" rx="13" ry="7" fill="#ab9d86"/><ellipse cx="125" cy="675" rx="13" ry="7" fill="#bcaf98"/><ellipse cx="164" cy="675" rx="13" ry="7" fill="#c2b49c"/><ellipse cx="203" cy="675" rx="13" ry="7" fill="#b3a58d"/><ellipse cx="242" cy="675" rx="13" ry="7" fill="#c9bca6"/><ellipse cx="281" cy="675" rx="13" ry="7" fill="#ab9d86"/><ellipse cx="320" cy="675" rx="13" ry="7" fill="#bcaf98"/><ellipse cx="359" cy="675" rx="13" ry="7" fill="#c2b49c"/><ellipse cx="398" cy="675" rx="13" ry="7" fill="#b3a58d"/><ellipse cx="437" cy="675" rx="13" ry="7" fill="#c9bca6"/><ellipse cx="476" cy="675" rx="13" ry="7" fill="#ab9d86"/><ellipse cx="515" cy="675" rx="13" ry="7" fill="#bcaf98"/><ellipse cx="554" cy="675" rx="13" ry="7" fill="#c2b49c"/><ellipse cx="593" cy="675" rx="13" ry="7" fill="#b3a58d"/><ellipse cx="632" cy="675" rx="13" ry="7" fill="#c9bca6"/><ellipse cx="671" cy="675" rx="13" ry="7" fill="#ab9d86"/><ellipse cx="710" cy="675" rx="13" ry="7" fill="#bcaf98"/><ellipse cx="749" cy="675" rx="13" ry="7" fill="#c2b49c"/><ellipse cx="788" cy="675" rx="13" ry="7" fill="#b3a58d"/><ellipse cx="827" cy="675" rx="13" ry="7" fill="#c9bca6"/><ellipse cx="866" cy="675" rx="13" ry="7" fill="#ab9d86"/><ellipse cx="905" cy="675" rx="13" ry="7" fill="#bcaf98"/><ellipse cx="944" cy="675" rx="13" ry="7" fill="#c2b49c"/><ellipse cx="983" cy="675" rx="13" ry="7" fill="#b3a58d"/>
+    <ellipse cx="-12" cy="697" rx="16" ry="8" fill="#c9bca6"/><ellipse cx="35" cy="697" rx="16" ry="8" fill="#ab9d86"/><ellipse cx="82" cy="697" rx="16" ry="8" fill="#bcaf98"/><ellipse cx="129" cy="697" rx="16" ry="8" fill="#c2b49c"/><ellipse cx="176" cy="697" rx="16" ry="8" fill="#b3a58d"/><ellipse cx="223" cy="697" rx="16" ry="8" fill="#c9bca6"/><ellipse cx="270" cy="697" rx="16" ry="8" fill="#ab9d86"/><ellipse cx="317" cy="697" rx="16" ry="8" fill="#bcaf98"/><ellipse cx="364" cy="697" rx="16" ry="8" fill="#c2b49c"/><ellipse cx="411" cy="697" rx="16" ry="8" fill="#b3a58d"/><ellipse cx="458" cy="697" rx="16" ry="8" fill="#c9bca6"/><ellipse cx="505" cy="697" rx="16" ry="8" fill="#ab9d86"/><ellipse cx="552" cy="697" rx="16" ry="8" fill="#bcaf98"/><ellipse cx="599" cy="697" rx="16" ry="8" fill="#c2b49c"/><ellipse cx="646" cy="697" rx="16" ry="8" fill="#b3a58d"/><ellipse cx="693" cy="697" rx="16" ry="8" fill="#c9bca6"/><ellipse cx="740" cy="697" rx="16" ry="8" fill="#ab9d86"/><ellipse cx="787" cy="697" rx="16" ry="8" fill="#bcaf98"/><ellipse cx="834" cy="697" rx="16" ry="8" fill="#c2b49c"/><ellipse cx="881" cy="697" rx="16" ry="8" fill="#b3a58d"/><ellipse cx="928" cy="697" rx="16" ry="8" fill="#c9bca6"/><ellipse cx="975" cy="697" rx="16" ry="8" fill="#ab9d86"/>
+  </g>
+
+  <!-- paper grain -->
+  <rect x="0" y="0" width="1000" height="720" filter="url(#grain)" opacity="0.06" style="mix-blend-mode:multiply"/>
+</svg>
+</sc-if>
+
+<sc-if value="{{ isSilhouette }}" hint-placeholder-val="{{ true }}">
+<svg viewBox="0 0 420 150" width="100%" height="100%" preserveAspectRatio="xMidYMax slice" role="img" aria-label="Town skyline" style="display:block">
+  <defs>
+    <filter id="wc2" x="-8%" y="-8%" width="116%" height="116%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.02 0.025" numOctaves="2" seed="9" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="6"/>
+    </filter>
+  </defs>
+  <g fill="{{ inkColor }}" filter="url(#wc2)">
+    <rect x="10" y="80" width="46" height="70"/><polygon points="4,82 33,52 62,82"/>
+    <rect x="58" y="60" width="42" height="90"/><polygon points="52,62 79,30 106,62"/>
+    <rect x="104" y="92" width="34" height="58"/><polygon points="98,94 121,66 144,94"/>
+    <rect x="142" y="44" width="40" height="106"/><polygon points="136,46 162,6 188,46"/>
+    <rect x="186" y="72" width="48" height="78"/><polygon points="180,74 210,44 240,74"/>
+    <rect x="238" y="88" width="36" height="62"/><polygon points="232,90 256,62 280,90"/>
+    <rect x="278" y="66" width="44" height="84"/><polygon points="272,68 300,36 328,68"/>
+    <rect x="326" y="90" width="40" height="60"/><polygon points="320,92 346,64 372,92"/>
+    <rect x="368" y="74" width="44" height="76"/><polygon points="362,76 390,46 418,76"/>
+  </g>
+</svg>
+</sc-if>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1000,&quot;height&quot;:720},&quot;variant&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;hero&quot;,&quot;silhouette&quot;],&quot;default&quot;:&quot;hero&quot;,&quot;tsType&quot;:&quot;'hero'|'silhouette'&quot;},&quot;inkColor&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;rgba(255,255,255,0.16)&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const v = this.props.variant || 'hero';
+    return {
+      isHero: v === 'hero',
+      isSilhouette: v === 'silhouette',
+      inkColor: this.props.inkColor || 'rgba(255,255,255,0.16)',
+    };
+  }
+}
+</script>
+</body>
+</html>

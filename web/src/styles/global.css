@@ -1222,7 +1222,7 @@ button.cal-cell:hover {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  font-size: 0.75rem;
+  font-size: var(--text-caption); /* 13px legibility floor holds even here */
   font-weight: 700;
   letter-spacing: 0.03em;
   color: var(--warn-text);
@@ -1279,13 +1279,6 @@ button.cal-cell:hover {
 
 .marker-top {
   background: var(--terracotta);
-}
-
-.rec-columns {
-  display: grid;
-  grid-template-columns: 1.55fr 1fr;
-  gap: 22px;
-  align-items: start;
 }
 
 /* --- Events ------------------------------------------------------------------- */
@@ -1541,9 +1534,6 @@ button.cal-cell:hover {
 /* --- Responsive ----------------------------------------------------------------- */
 
 @media (max-width: 1000px) {
-  .rec-columns {
-    grid-template-columns: 1fr;
-  }
 }
 
 @media (max-width: 880px) {

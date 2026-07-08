@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Spectral:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { font-family: 'Spectral', Georgia, serif; color: #3b3229; background: #f4ece0; -webkit-font-smoothing: antialiased; }
+  a { color: #c96f4a; text-decoration: none; }
+  a:hover { color: #a9522f; }
+</style>
+</helmet>
+
+<div style="display:flex;min-height:100vh;background:#f4ece0;">
+  <!-- sidebar -->
+  <aside style="width:246px;flex-shrink:0;background:#2f4a47;color:#e7efe9;position:relative;display:flex;flex-direction:column;padding:26px 18px 0;">
+    <div style="display:flex;align-items:center;gap:10px;padding:0 8px 26px;">
+      <svg width="27" height="25" viewBox="0 0 30 28" fill="none" stroke="#e6c07a" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 13 L15 4 L26 13"/><path d="M7 12 V24 H23 V12"/><rect x="12.5" y="16" width="5" height="8"/></svg>
+      <span style="font-family:'DM Serif Display';font-size:22px;color:#fdf8ee;">PricePilot</span>
+    </div>
+    <nav style="display:flex;flex-direction:column;gap:4px;">
+      <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:11px;color:#cfe0d8;font-family:'Spectral';font-size:16px;cursor:pointer;" style-hover="background:rgba(255,255,255,0.08);">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="6" height="6" rx="1"/><rect x="10" y="2" width="6" height="6" rx="1"/><rect x="2" y="10" width="6" height="6" rx="1"/><rect x="10" y="10" width="6" height="6" rx="1"/></svg>
+        Dashboard
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:11px;background:#c96f4a;color:#fff;font-family:'Spectral';font-weight:600;font-size:16px;">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2 L15 8 L9 16 L3 10 Z"/><circle cx="6.5" cy="6.5" r="1"/></svg>
+        Recommendations
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:11px;color:#cfe0d8;font-family:'Spectral';font-size:16px;cursor:pointer;" style-hover="background:rgba(255,255,255,0.08);">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2 16 V10 M7 16 V5 M12 16 V8 M16 16 V3"/></svg>
+        Competitors
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:11px;color:#cfe0d8;font-family:'Spectral';font-size:16px;cursor:pointer;" style-hover="background:rgba(255,255,255,0.08);">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="3.5" width="13" height="12" rx="2"/><path d="M2.5 7 H15.5 M6 2 V5 M12 2 V5"/></svg>
+        Events
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:11px;color:#cfe0d8;font-family:'Spectral';font-size:16px;cursor:pointer;" style-hover="background:rgba(255,255,255,0.08);">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="9" r="3"/><path d="M9 1.5 V3 M9 15 V16.5 M1.5 9 H3 M15 9 H16.5 M3.8 3.8 L4.9 4.9 M13.1 13.1 L14.2 14.2 M14.2 3.8 L13.1 4.9 M4.9 13.1 L3.8 14.2"/></svg>
+        Settings
+      </div>
+    </nav>
+    <div style="margin:auto -18px 0;position:relative;pointer-events:none;">
+      <img src="assets/houses/village-sidebar.png" style="display:block;width:100%;height:auto;"/>
+    </div>
+  </aside>
+
+  <!-- main -->
+  <div style="flex:1;display:flex;flex-direction:column;min-width:0;">
+    <header style="display:flex;justify-content:space-between;align-items:center;gap:16px;padding:16px 28px;background:#fbf6ec;border-bottom:1px solid #e6dcc7;">
+      <span style="font-family:'DM Serif Display';font-style:italic;font-size:18px;color:#6f6357;">Your pricing copilot</span>
+      <div style="display:flex;align-items:center;gap:16px;">
+        <div style="display:flex;align-items:center;gap:8px;font-family:'Spectral';font-size:15px;color:#3b3229;background:#fffdf8;border:1.5px solid #d9cdb8;border-radius:10px;padding:9px 13px;">
+          Casa Luca, Sibiu
+          <svg width="13" height="13" viewBox="0 0 12 12" fill="none" stroke="#8a7c6a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5 L6 8 L9.5 4.5"/></svg>
+        </div>
+        <span style="font-family:'Spectral';font-weight:700;font-size:15px;color:#3b3229;">Ana Popescu</span>
+        <button type="button" style="font-family:'Spectral';font-weight:600;font-size:14px;color:#c96f4a;background:#fffdf8;border:1.5px solid #c96f4a;border-radius:10px;padding:8px 16px;cursor:pointer;" style-hover="background:#faeee6;">Log out</button>
+      </div>
+    </header>
+
+    <div style="padding:28px 32px 56px;overflow:auto;flex:1;background:radial-gradient(90% 55% at 100% 0%, rgba(224,178,94,0.13) 0%, rgba(224,178,94,0) 55%);">
+      <h2 style="font-family:'DM Serif Display';font-size:32px;color:#3b3229;margin:0;">Recommendations &amp; price calendar</h2>
+      <svg width="210" height="9" viewBox="0 0 210 9" fill="none" stroke="#c96f4a" stroke-width="2.6" stroke-linecap="round" style="margin-top:2px;"><path d="M2 6 Q54 1 105 5 T208 4"/></svg>
+      <p style="font-family:'Spectral';color:#6f6357;font-size:16px;margin:10px 0 24px;max-width:620px;">Your rate for each night against the local competitor band — with the days worth acting on called out.</p>
+
+      <!-- ===== PRICE CALENDAR ===== -->
+      <section style="position:relative;background:#fffdf8;border:1.5px solid #e6dcc7;border-radius:16px;padding:24px 26px;box-shadow:0 10px 24px rgba(59,50,41,0.06);overflow:hidden;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px;margin-bottom:18px;">
+          <div style="display:flex;align-items:baseline;gap:12px;">
+            <h3 style="font-family:'DM Serif Display';font-size:24px;color:#3b3229;margin:0;">{{ monthLabel }}</h3>
+            <span style="font-family:'Spectral';font-size:14px;color:#8a7c6a;">Casa Luca · Double Deluxe</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:18px;font-family:'Spectral';font-size:13px;color:#6f6357;">
+            <span style="display:flex;align-items:center;gap:7px;"><span style="width:11px;height:11px;border-radius:50%;background:#6f9a86;"></span>Room to raise</span>
+            <span style="display:flex;align-items:center;gap:7px;"><span style="width:11px;height:11px;border-radius:50%;background:#d9a441;"></span>Well placed</span>
+            <span style="display:flex;align-items:center;gap:7px;"><span style="width:11px;height:11px;border-radius:50%;background:#c96f4a;"></span>Near the top</span>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;font-family:'Spectral';font-size:12px;font-weight:600;color:#8a7c6a;text-transform:uppercase;letter-spacing:0.04em;padding:0 2px 4px;">
+          <div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div><div>Sun</div>
+        </div>
+
+        <sc-for list="{{ weeks }}" as="week" hint-placeholder-count="6">
+          <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:6px;">
+            <sc-for list="{{ week.days }}" as="day" hint-placeholder-count="7">
+              <div style="position:relative;border-radius:10px;padding:8px 9px 10px;min-height:96px;border:1px solid #ece2cf;background:{{ day.bg }};">
+                <div style="display:flex;justify-content:space-between;align-items:center;min-height:16px;">
+                  <span style="font-family:'Spectral';font-weight:600;font-size:13px;color:{{ day.numColor }};">{{ day.dn }}</span>
+                  <sc-if value="{{ day.showEv }}" hint-placeholder-val="{{ false }}">
+                    <span style="display:flex;align-items:center;gap:3px;font-family:'Spectral';font-size:9.5px;font-weight:700;letter-spacing:0.03em;color:#a9522f;background:#f7dcc4;padding:2px 6px;border-radius:999px;">
+                      <svg width="8" height="9" viewBox="0 0 8 9" fill="#a9522f"><path d="M4 0 L8 4 H0 Z"/><rect x="2.5" y="4" width="3" height="5"/></svg>FITS
+                    </span>
+                  </sc-if>
+                </div>
+                <sc-if value="{{ day.showPrice }}" hint-placeholder-val="{{ true }}">
+                  <div style="font-family:'DM Serif Display';font-size:19px;color:#3b3229;margin-top:7px;line-height:1;">{{ day.priceText }}<span style="font-family:'Spectral';font-size:10px;color:#8a7c6a;font-weight:600;"> RON</span></div>
+                  <div style="font-family:'Spectral';font-size:10.5px;color:#8a7c6a;margin-top:3px;">vs {{ day.rangeText }}</div>
+                  <div style="position:relative;height:5px;border-radius:3px;background:#eadfc9;margin-top:9px;">
+                    <div style="position:absolute;top:-2.5px;width:10px;height:10px;border-radius:50%;background:{{ day.markerColor }};left:{{ day.posPct }};transform:translateX(-50%);border:1.5px solid #fffdf8;box-shadow:0 1px 2px rgba(59,50,41,0.25);"></div>
+                  </div>
+                </sc-if>
+              </div>
+            </sc-for>
+          </div>
+        </sc-for>
+      </section>
+
+      <!-- ===== RECOMMENDATION + EMPTY STATE ===== -->
+      <div style="display:grid;grid-template-columns:1.55fr 1fr;gap:22px;margin-top:26px;align-items:start;">
+
+        <!-- live recommendation card -->
+        <article style="background:#fffdf8;border:1.5px solid #e6dcc7;border-radius:16px;box-shadow:0 10px 24px rgba(59,50,41,0.06);padding:24px 26px;">
+          <header style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;">
+            <div>
+              <h3 style="font-family:'DM Serif Display';font-size:22px;color:#3b3229;margin:0;">Sat, 14 June 2026</h3>
+              <p style="font-family:'Spectral';color:#6f6357;margin:2px 0 0;font-size:15px;">Double Deluxe · FITS opening weekend</p>
+            </div>
+            <span style="font-family:'Spectral';font-weight:600;font-size:13px;color:#8a4b08;background:#fdf0dc;padding:5px 12px;border-radius:999px;">Pending</span>
+          </header>
+
+          <div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin:18px 0;">
+            <span style="font-family:'DM Serif Display';font-size:26px;color:#8a7c6a;text-decoration:line-through;text-decoration-thickness:2px;">350 RON</span>
+            <span style="color:#8a7c6a;font-size:22px;">→</span>
+            <span style="font-family:'DM Serif Display';font-size:34px;color:#0f4675;">440 RON</span>
+            <span style="font-family:'Spectral';font-size:14px;color:#6f6357;">recommended</span>
+          </div>
+
+          <h4 style="font-family:'Spectral';font-size:15px;font-weight:700;color:#4a4034;margin:0 0 10px;">Why this price</h4>
+          <ul style="list-style:none;padding:0;margin:0;display:grid;gap:9px;">
+            <li style="display:flex;gap:12px;align-items:baseline;">
+              <span style="flex-shrink:0;min-width:54px;text-align:center;font-family:'Spectral';font-weight:700;font-size:13px;background:#e2f3e8;color:#196a3e;border-radius:999px;padding:2px 8px;">+15%</span>
+              <span style="font-family:'Spectral';font-size:15px;color:#3b3229;">Sibiu Theatre Festival (FITS) runs 12–21 June — demand peaks this weekend.</span>
+            </li>
+            <li style="display:flex;gap:12px;align-items:baseline;">
+              <span style="flex-shrink:0;min-width:54px;text-align:center;font-family:'Spectral';font-weight:700;font-size:13px;background:#e2f3e8;color:#196a3e;border-radius:999px;padding:2px 8px;">+12%</span>
+              <span style="font-family:'Spectral';font-size:15px;color:#3b3229;">8 of 10 tracked competitors raised their rates for these nights.</span>
+            </li>
+            <li style="display:flex;gap:12px;align-items:baseline;">
+              <span style="flex-shrink:0;min-width:54px;text-align:center;font-family:'Spectral';font-weight:700;font-size:13px;background:#e2f3e8;color:#196a3e;border-radius:999px;padding:2px 8px;">+5%</span>
+              <span style="font-family:'Spectral';font-size:15px;color:#3b3229;">Saturday night — you typically sell out weekends first.</span>
+            </li>
+          </ul>
+
+          <div style="margin-top:16px;padding:14px 16px;background:#f6efe2;border-radius:11px;font-family:'Spectral';font-size:15px;color:#3b3229;">
+            Estimated <strong style="color:#196a3e;">+3,400 RON</strong> across the FITS period if accepted.
+          </div>
+
+          <footer style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;margin-top:18px;padding-top:16px;border-top:1px solid #ece2cf;">
+            <span style="font-family:'Spectral';font-size:13px;color:#8a7c6a;">Competitor prices · 2h ago · Events · today</span>
+            <div style="display:flex;gap:10px;">
+              <button type="button" style="font-family:'Spectral';font-weight:700;font-size:15px;background:#c96f4a;color:#fff;border:none;border-radius:11px;padding:11px 20px;cursor:pointer;box-shadow:0 6px 16px rgba(201,111,74,0.28);" style-hover="background:#b5654a;">Accept price</button>
+              <button type="button" style="font-family:'Spectral';font-weight:600;font-size:15px;background:#fffdf8;color:#6f6357;border:1.5px solid #d9cdb8;border-radius:11px;padding:11px 20px;cursor:pointer;" style-hover="background:#f4ece0;">Dismiss</button>
+            </div>
+          </footer>
+        </article>
+
+        <!-- storybook empty state -->
+        <aside style="background:#fbf6ec;border:1.5px dashed #d8c6a4;border-radius:16px;padding:28px 24px;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:280px;">
+          <img src="assets/houses/house-sage.png" style="width:96px;height:auto;opacity:0.95;"/>
+          <h3 style="font-family:'DM Serif Display';font-size:21px;color:#3b3229;margin:14px 0 6px;">All quiet on your street</h3>
+          <p style="font-family:'Spectral';font-size:15px;color:#6f6357;margin:0;max-width:230px;">No competitor moved their prices overnight. We'll nudge you the moment something changes.</p>
+        </aside>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const year = 2026, month = 5; // June
+    const first = new Date(year, month, 1);
+    const startDow = (first.getDay() + 6) % 7; // Monday = 0
+    const events = {}; for (let d = 12; d <= 21; d++) events[d] = true;
+    const start = new Date(year, month, 1 - startDow);
+    const weeks = [];
+    let k = 0;
+    for (let w = 0; w < 6; w++) {
+      const days = [];
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(start); d.setDate(start.getDate() + k); k++;
+        const inMonth = d.getMonth() === month;
+        const dn = d.getDate();
+        const dow = d.getDay();
+        const weekend = (dow === 0 || dow === 6);
+        const ev = inMonth && !!events[dn];
+        let base = 340 + ((dn * 13) % 40) + (weekend ? 45 : 0);
+        if (ev) base = 430 + ((dn * 7) % 40);
+        const compLow = Math.round(base * 0.82 / 5) * 5;
+        const compHigh = Math.round(base * 1.2 / 5) * 5;
+        const pos = (base - compLow) / (compHigh - compLow);
+        const posC = Math.max(6, Math.min(94, Math.round(pos * 100)));
+        const mc = pos < 0.42 ? '#6f9a86' : (pos < 0.72 ? '#d9a441' : '#c96f4a');
+        const bg = !inMonth ? '#f1ece2' : (ev ? '#fdeedd' : (weekend ? '#f6efe2' : '#fffdf8'));
+        days.push({
+          dn: inMonth ? String(dn) : '',
+          numColor: inMonth ? (ev ? '#a9522f' : '#6f6357') : '#c8bca6',
+          bg,
+          showEv: ev,
+          showPrice: inMonth,
+          priceText: inMonth ? String(base) : '',
+          rangeText: inMonth ? (compLow + '–' + compHigh) : '',
+          posPct: posC + '%',
+          markerColor: mc,
+        });
+      }
+      weeks.push({ days });
+    }
+    return { weeks, monthLabel: 'June 2026' };
+  }
+}
+</script>
+</body>
+</html>

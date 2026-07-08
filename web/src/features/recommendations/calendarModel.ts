@@ -69,6 +69,13 @@ function findFactor(row: Recommendation, rule: string): RecommendationFactor | u
 }
 
 function bandOf(row: Recommendation): { low: number; high: number } | null {
+  // The band caption borrows the cell price's currency symbol, so the factors
+  // payload currency must agree with the row's — guard against future engine
+  // versions ever diverging (today they never do).
+  const payloadCurrency = row.factors?.currency;
+  if (typeof payloadCurrency === 'string' && payloadCurrency !== row.currency) {
+    return null;
+  }
   const factor = findFactor(row, 'competitor_position');
   const low = factor?.band_low;
   const high = factor?.band_high;

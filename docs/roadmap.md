@@ -64,6 +64,49 @@ Verified: dataplane 86/86 passed (first fully green DB-backed run) + ruff clean;
 backend 37/37, build 0 warnings; both migrations applied to the dev DB; workflow
 linted with actionlint.
 
+## Wave 3 (real market data & watercolor UI) — landed 2026-07-08
+
+Spec: `superpowers/specs/2026-07-08-wave-3-market-data-and-watercolor-ui-design.md` ·
+plan: `superpowers/plans/2026-07-08-wave-3-market-data-and-watercolor-ui.md` · ADR 0004.
+
+- [x] **Scraping pipeline (Part A)**: scrapers fully pure (`SearchScraper`: plan_request
+  + parse_listings); ALL network I/O in `PoliteClient` (jittered delay, bounded retries,
+  403/429/challenge → `ScraperBlockedError`, never retried); Booking.com city-search
+  parser against realistic `data-testid` fixture; significant-token competitor matching
+  (unmatched surfaced per run); orchestrator persists append-only `scraped_rates` +
+  per-source `scrape_runs` (succeeded iff ≥1 rate; no competitors → no run row; wrong
+  currency dropped, aggregated per offender); real `handle_scrape_competitor_rates`
+  (property/city/all scope); capture + dry-run CLIs for human-in-the-loop iteration.
+- [x] **Job payload isolation (backend)**: POST /jobs validates payload `property_id`
+  (tenant-filtered 404) AND `tenant_id` (must equal caller's; review finding) — job
+  payloads cannot trigger work for another tenant. openapi.yaml documents 400/404.
+- [x] **Demand signals (Part B)**: RO public holidays via `holidays` package (any year)
+  + Open-Meteo 16-day forecast (temp max, precipitation; verified against the live API)
+  → idempotent uuid5 upserts into `demand_signals` (`created_at` refresh = freshness);
+  real `handle_ingest_demand_signals` (all-or-nothing; no-coords cities skip weather).
+- [x] **Factors v2**: `competitor_position` emits `band_low`/`band_high` (iff
+  sample_size > 0); `ENGINE_VERSION="2"`; contract changelog added; renderer tolerant
+  of v1 rows.
+- [x] **Watercolor UI (Part C, design handoff)**: handoff palette + self-hosted DM Serif
+  Display/Spectral; animated login townscape (SVG, reduced-motion aware); teal sidebar
+  shell + village illustration; dashboard greeting/corner-art cards; month price
+  calendar from factors v2 band (pure `calendarModel`, markers 0.42/0.72, pending cells
+  scroll to their card); illustrated empty state. **Refresh button fixed**: `refresh_all`
+  (always rejected by the API) → real sequence scrape → ingest.events → engine.
+  A11y-hardened beyond the handoff (AA contrast, ≥13px captions, no fake controls).
+- [x] Verified: dataplane 168/168 (integration against migrated Postgres, incl. jobs
+  pipeline smoke: claim → handler → succeeded results), backend 47/47 (0 warnings),
+  web 74/74 + typecheck + build; compose config valid; live Open-Meteo sanity check;
+  179 pending v2 recommendations regenerated on the dev DB.
+- [x] Code review (A+B): REQUEST CHANGES → all actionable findings fixed (tenant_id
+  gap, openapi drift, capture gitignore, issue aggregation); re-verify pending note
+  below. Part C review: see below.
+
+**Booking.com live-run status:** the pipeline is fixture-verified end-to-end; the live
+site needs human-in-the-loop iteration (anti-bot). Loop:
+`python -m pricepilot.scrapers.capture booking --city sibiu` → inspect/trim → fix
+selectors → `python -m pricepilot.scrapers.run --city sibiu --days 7` → `--write`.
+
 ## Backlog (ordered roughly by value)
 
 - [x] End-to-end demo doc: `docs/demo.md` (compose/local, seed, engine run, login)

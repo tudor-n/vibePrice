@@ -91,16 +91,20 @@ export function PriceCalendar({ rows, propertyName, onDayClick }: PriceCalendarP
   const [monthChoice, setMonthChoice] = useState<string | null>(null);
   const [roomChoice, setRoomChoice] = useState<string | null>(null);
 
-  const months = monthsWithData(rows);
   const roomNames = roomTypeNamesFrom(rows);
-  if (months.length === 0 || roomNames.length === 0) return null;
+  if (roomNames.length === 0) return null;
 
   // Fall back gracefully when the stored choice no longer exists in the data
-  // (property switch, range change): first month with data, first room name.
-  const month = monthChoice && months.includes(monthChoice) ? monthChoice : months[0];
+  // (property switch, range change): first room name, first month with data.
   const room = roomChoice && roomNames.includes(roomChoice) ? roomChoice : roomNames[0];
+  // Month bounds follow the SELECTED room — rooms can have data in different
+  // months, and a grid of 42 blank cells helps no one.
+  const roomRows = rows.filter((row) => row.roomTypeName === room);
+  const months = monthsWithData(roomRows);
+  if (months.length === 0) return null;
+  const month = monthChoice && months.includes(monthChoice) ? monthChoice : months[0];
   const monthIndex = months.indexOf(month);
-  const days = buildCalendarModel(rows, month, room);
+  const days = buildCalendarModel(roomRows, month, room);
 
   return (
     <section className="cal-card" aria-label="Price calendar">
@@ -162,7 +166,7 @@ export function PriceCalendar({ rows, propertyName, onDayClick }: PriceCalendarP
         </div>
       </div>
 
-      <div className="cal-weekdays" aria-hidden="true">
+      <div className="cal-weekdays">
         {WEEKDAYS.map((weekday) => (
           <div key={weekday}>{weekday}</div>
         ))}
