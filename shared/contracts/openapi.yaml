@@ -169,6 +169,21 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/Event" }
+  /points-of-interest:
+    get:
+      summary: Points of interest for a city (public reference data, not tenant-scoped)
+      parameters:
+        - { name: city, in: query, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: "OK (empty array for an unknown city)"
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Poi" }
+        "400":
+          description: city is required
   /jobs:
     post:
       summary: Trigger a dataplane job (e.g. refresh now)
@@ -313,6 +328,16 @@ components:
         startDate: { type: string, format: date }
         endDate: { type: string, format: date }
         impactScore: { type: integer, minimum: 0, maximum: 100 }
+    Poi:
+      type: object
+      description: "City-scoped landmark reference data used by the proximity rule; not tenant-scoped."
+      properties:
+        id: { type: string, format: uuid }
+        city: { type: string }
+        name: { type: string }
+        latitude: { type: number }
+        longitude: { type: number }
+        weight: { type: integer, minimum: 0, maximum: 100 }
     Job:
       type: object
       properties:

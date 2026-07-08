@@ -69,6 +69,14 @@ public sealed record EventDto(
     DateOnly EndDate,
     int ImpactScore);
 
+public sealed record PoiDto(
+    Guid Id,
+    string City,
+    string Name,
+    decimal Latitude,
+    decimal Longitude,
+    int Weight);
+
 public sealed record UserInfoDto(
     Guid Id,
     string Email,

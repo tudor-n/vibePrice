@@ -24,6 +24,7 @@ public static class DependencyInjection
         services.AddScoped<IRecommendationQueries, RecommendationQueries>();
         services.AddScoped<IJobDispatcher, JobDispatcher>();
         services.AddScoped<IEventQueries, EventQueries>();
+        services.AddScoped<IPoiQueries, PoiQueries>();
 
         return services;
     }
