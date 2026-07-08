@@ -134,7 +134,7 @@ paths:
         "200": { description: Updated }
   /properties/{propertyId}/competitors:
     get:
-      summary: Tracked competitors and their latest scraped rates
+      summary: Discovered, tracked competitors (excludes untracked ones) and their latest scraped rates
       parameters:
         - { name: propertyId, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
@@ -145,17 +145,15 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/Competitor" }
-    post:
-      summary: Track a new competitor
+  /competitors/{competitorId}:
+    delete:
+      summary: Untrack a discovered competitor (soft-delete; sets excludedAt, row is retained)
       parameters:
-        - { name: propertyId, in: path, required: true, schema: { type: string, format: uuid } }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/CompetitorCreate" }
+        - { name: competitorId, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
-        "201": { description: Created }
+        "204": { description: Untracked }
+        "404":
+          description: Competitor does not belong to the caller's tenant, or is already untracked (indistinguishable from a nonexistent id)
   /events:
     get:
       summary: Events for a city
@@ -288,10 +286,15 @@ components:
         createdAt: { type: string, format: date-time }
     Competitor:
       type: object
+      description: "Auto-discovered via Google Places; tracked competitors are created by the resolve_place job, never by the client."
       properties:
         id: { type: string, format: uuid }
         name: { type: string }
         sourceUrl: { type: string, nullable: true }
+        rating: { type: number, nullable: true }
+        ratingCount: { type: integer, nullable: true }
+        latitude: { type: number, nullable: true }
+        longitude: { type: number, nullable: true }
         latestRates:
           type: array
           items:
@@ -301,12 +304,6 @@ components:
               price: { type: number }
               currency: { type: string }
               capturedAt: { type: string, format: date-time }
-    CompetitorCreate:
-      type: object
-      required: [name, sourceUrl]
-      properties:
-        name: { type: string }
-        sourceUrl: { type: string, description: "OTA listing URL to scrape" }
     Event:
       type: object
       properties:

@@ -55,9 +55,11 @@ public sealed record CompetitorDto(
     Guid Id,
     string Name,
     string? SourceUrl,
+    decimal? Rating,
+    int? RatingCount,
+    decimal? Latitude,
+    decimal? Longitude,
     IReadOnlyList<CompetitorRateDto> LatestRates);
-
-public sealed record CompetitorCreateDto(string Name, string SourceUrl);
 
 public sealed record EventDto(
     Guid Id,

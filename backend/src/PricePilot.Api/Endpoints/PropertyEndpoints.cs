@@ -46,29 +46,6 @@ public static class PropertyEndpoints
             return competitors is null ? Results.NotFound() : Results.Ok(competitors);
         });
 
-        group.MapPost("/{propertyId:guid}/competitors", async (
-            Guid propertyId,
-            CompetitorCreateDto dto,
-            IPropertyService properties,
-            ITenantContext tenant,
-            CancellationToken ct) =>
-        {
-            if (tenant.TenantId is null)
-            {
-                return Results.Unauthorized();
-            }
-
-            if (string.IsNullOrWhiteSpace(dto.Name) || string.IsNullOrWhiteSpace(dto.SourceUrl))
-            {
-                return Results.BadRequest(new { error = "name and sourceUrl are required" });
-            }
-
-            var created = await properties.AddCompetitorAsync(propertyId, dto, ct);
-            return created is null
-                ? Results.NotFound()
-                : Results.Created($"/api/v1/properties/{propertyId}/competitors", created);
-        });
-
         group.MapPatch("/{propertyId:guid}/place", async (
             Guid propertyId, PlacePickDto dto, IPropertyService properties, CancellationToken ct) =>
         {
@@ -111,6 +88,16 @@ public static class PropertyEndpoints
         {
             var result = await recommendations.ListForPropertyAsync(propertyId, from, to, ct);
             return result is null ? Results.NotFound() : Results.Ok(result);
+        });
+
+        // Competitors are edited by id (discovered, not manually created), so untrack lives on a
+        // top-level /competitors route rather than nested under a property.
+        var competitors = api.MapGroup("/competitors").RequireAuthorization(AuthConstants.ApiPolicy);
+        competitors.MapDelete("/{competitorId:guid}", async (
+            Guid competitorId, IPropertyService properties, CancellationToken ct) =>
+        {
+            var ok = await properties.UntrackCompetitorAsync(competitorId, ct);
+            return ok ? Results.NoContent() : Results.NotFound();
         });
     }
 }

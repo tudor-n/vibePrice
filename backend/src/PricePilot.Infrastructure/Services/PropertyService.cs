@@ -64,17 +64,20 @@ public sealed class PropertyService(AppDbContext db, ITenantContext tenantContex
 
         var competitors = await db.Competitors
             .AsNoTracking()
-            .Where(c => c.PropertyId == propertyId)
+            .Where(c => c.PropertyId == propertyId && c.ExcludedAt == null)
             .OrderBy(c => c.Name)
             .ToListAsync(ct);
 
         var competitorIds = competitors.Select(c => c.Id).ToList();
-        var rates = await db.ScrapedRates
+        // Sorted client-side (LINQ to Objects): SQLite's provider (unit tests) cannot translate
+        // ORDER BY over DateTimeOffset columns; Postgres (production) has no such restriction.
+        var rates = (await db.ScrapedRates
             .AsNoTracking()
             .Where(r => competitorIds.Contains(r.CompetitorId))
+            .ToListAsync(ct))
             .OrderByDescending(r => r.CapturedAt)
             .Take(MaxRatesPerCompetitor * Math.Max(competitorIds.Count, 1))
-            .ToListAsync(ct);
+            .ToList();
 
         // Latest capture per (competitor, stay date), resolved in memory over the recent window.
         var latestByCompetitor = rates
@@ -87,6 +90,10 @@ public sealed class PropertyService(AppDbContext db, ITenantContext tenantContex
                 c.Id,
                 c.Name,
                 c.SourceUrl,
+                c.Rating,
+                c.RatingCount,
+                c.Latitude,
+                c.Longitude,
                 latestByCompetitor[c.Id]
                     .OrderBy(r => r.StayDate)
                     .Select(r => new CompetitorRateDto(r.StayDate, r.Price, r.Currency, r.CapturedAt))
@@ -94,32 +101,14 @@ public sealed class PropertyService(AppDbContext db, ITenantContext tenantContex
             .ToList();
     }
 
-    public async Task<CompetitorDto?> AddCompetitorAsync(Guid propertyId, CompetitorCreateDto dto, CancellationToken ct)
+    public async Task<bool> UntrackCompetitorAsync(Guid competitorId, CancellationToken ct)
     {
-        var tenantId = tenantContext.TenantId
-            ?? throw new InvalidOperationException("Cannot create a competitor without a resolved tenant.");
-
-        // Ownership check: the tenant filter means another tenant's property id is simply not found.
-        var propertyExists = await db.Properties.AsNoTracking().AnyAsync(p => p.Id == propertyId, ct);
-        if (!propertyExists)
-        {
-            return null;
-        }
-
-        var competitor = new Competitor
-        {
-            Id = Guid.NewGuid(),
-            TenantId = tenantId,
-            PropertyId = propertyId,
-            Name = dto.Name,
-            SourceUrl = dto.SourceUrl,
-            CreatedAt = DateTimeOffset.UtcNow,
-        };
-
-        db.Competitors.Add(competitor);
+        var competitor = await db.Competitors
+            .FirstOrDefaultAsync(c => c.Id == competitorId && c.ExcludedAt == null, ct);
+        if (competitor is null) return false; // foreign or already excluded
+        competitor.ExcludedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(ct);
-
-        return new CompetitorDto(competitor.Id, competitor.Name, competitor.SourceUrl, []);
+        return true;
     }
 
     public async Task<bool> PickPlaceAsync(Guid propertyId, string placeId, CancellationToken ct)
