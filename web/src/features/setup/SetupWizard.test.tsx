@@ -2,8 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { SetupWizard } from './SetupWizard';
 import { SetupGuard } from './SetupGuard';
+import { StepCompetitors } from './steps/StepCompetitors';
 import { renderWithProviders } from '../../test/renderWithProviders';
-import type { Property } from '../../api/types';
+import type { Competitor, Property, Recommendation } from '../../api/types';
 
 const PROPERTY_ID = '33333333-3333-4333-8333-333333333333';
 
@@ -44,6 +45,40 @@ const resolvedWithRooms: Property = {
   ],
 };
 
+const discoveredCompetitors: Competitor[] = [
+  { id: 'comp-1', name: 'Hotel Continental', rating: 4.3, ratingCount: 512, latestRates: [] },
+  { id: 'comp-2', name: 'Pensiunea Rustic', latestRates: [] },
+];
+
+const firstRecommendation: Recommendation = {
+  id: 'rec-1',
+  roomTypeId: 'room-1',
+  stayDate: '2026-08-01',
+  currentPrice: 350,
+  recommendedPrice: 399,
+  currency: 'RON',
+  expectedImpact: 500,
+  status: 'pending',
+  factors: {
+    engine_version: '1',
+    base_price: 350,
+    currency: 'RON',
+    factors: [
+      { rule: 'seasonality', adjustment_pct: 8, reason: 'August is peak season in Sibiu.' },
+    ],
+    recommended_price: 399,
+    expected_impact: {
+      estimate: 500,
+      currency: 'RON',
+      period_start: '2026-08-01',
+      period_end: '2026-08-01',
+      method: 'test-fixture',
+    },
+    data_freshness: {},
+  },
+  createdAt: '2026-07-09T00:00:00Z',
+};
+
 function jsonResponse(payload: unknown, status = 200) {
   return new Response(JSON.stringify(payload), {
     status,
@@ -51,17 +86,28 @@ function jsonResponse(payload: unknown, status = 200) {
   });
 }
 
+interface JobBody {
+  type: string;
+  payload?: Record<string, unknown>;
+}
+
 const fetchMock = vi.fn<typeof fetch>();
 let propertyRows: Property[] = [];
+let competitorRows: Competitor[] = [];
+let recommendationRows: Recommendation[] = [];
 let lastCreateBody: unknown = null;
 let lastPickBody: unknown = null;
 let lastRoomBody: unknown = null;
+let jobBodies: JobBody[] = [];
 
 beforeEach(() => {
   propertyRows = [];
+  competitorRows = [];
+  recommendationRows = [];
   lastCreateBody = null;
   lastPickBody = null;
   lastRoomBody = null;
+  jobBodies = [];
   vi.stubGlobal('fetch', fetchMock);
   fetchMock.mockImplementation(async (input, init) => {
     const url =
@@ -87,6 +133,25 @@ beforeEach(() => {
     }
     if (method === 'GET' && url.endsWith('/properties')) {
       return jsonResponse(propertyRows);
+    }
+    if (method === 'GET' && url.includes('/competitors')) {
+      return jsonResponse(competitorRows);
+    }
+    if (method === 'GET' && url.includes('/recommendations')) {
+      return jsonResponse(recommendationRows);
+    }
+    if (method === 'POST' && url.endsWith('/jobs')) {
+      const body = JSON.parse(String(init?.body)) as JobBody;
+      jobBodies.push(body);
+      return jsonResponse(
+        {
+          id: `00000000-0000-4000-8000-00000000000${jobBodies.length}`,
+          type: body.type,
+          status: 'queued',
+          createdAt: new Date().toISOString(),
+        },
+        202,
+      );
     }
     throw new Error(`Unexpected fetch in test: ${method} ${url}`);
   });
@@ -209,11 +274,136 @@ describe('SetupWizard — step 3: your room + rate', () => {
   });
 });
 
-describe('SetupWizard — step 4 placeholder', () => {
-  it('renders a placeholder once the property has room types (steps 4-5 land later)', async () => {
+describe('SetupWizard — step 4: finding competitors', () => {
+  it('shows a "finding hotels" status while none are discovered yet', async () => {
     propertyRows = [resolvedWithRooms];
+    competitorRows = [];
     renderWithProviders(<SetupWizard />);
-    expect(await screen.findByRole('heading', { name: /finding your competitors/i })).toBeInTheDocument();
+    expect(await screen.findByText('Finding hotels near you…')).toBeInTheDocument();
+  });
+
+  it('lists the discovered names + ratings once competitors already exist', async () => {
+    // StepCompetitors rendered on its own: the wizard shell auto-advances
+    // past step 4 the instant competitorCount > 0 (deriveStep has no
+    // separate "acknowledged" gate — see useSetupProgress.ts), so this
+    // branch of the step component is exercised directly here rather than
+    // through the always-advancing <SetupWizard/>.
+    propertyRows = [resolvedWithRooms];
+    competitorRows = discoveredCompetitors;
+    renderWithProviders(<StepCompetitors property={resolvedWithRooms} />);
+
+    expect(await screen.findByText('Hotel Continental')).toBeInTheDocument();
+    expect(screen.getByText('★ 4.3 (512 reviews)')).toBeInTheDocument();
+    expect(screen.getByText('Pensiunea Rustic')).toBeInTheDocument();
+    expect(screen.getByText('No rating yet')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Next' })).toBeInTheDocument();
+    expect(screen.queryByText('Finding hotels near you…')).not.toBeInTheDocument();
+  });
+
+  it('advances the wizard to step 5 once competitors are discovered', async () => {
+    propertyRows = [resolvedWithRooms];
+    competitorRows = [];
+    renderWithProviders(<SetupWizard />);
+    await screen.findByText('Finding hotels near you…');
+
+    // The mocked competitors response becomes non-empty; useCompetitors
+    // polls every 3s (competitorsRefetchInterval) so this settles on its
+    // own, without a reload or any user action.
+    competitorRows = discoveredCompetitors;
+
+    expect(
+      await screen.findByRole(
+        'heading',
+        { name: /let's see your first price/i },
+        { timeout: 6000 },
+      ),
+    ).toBeInTheDocument();
+  });
+});
+
+describe('SetupWizard — step 5: your first price', () => {
+  it('running the pipeline triggers the 3 jobs in order, then shows the first recommendation', async () => {
+    propertyRows = [resolvedWithRooms];
+    competitorRows = discoveredCompetitors;
+    recommendationRows = [];
+    renderWithProviders(<SetupWizard />, {
+      route: '/setup',
+      path: '/setup',
+      routes: [{ path: '/', element: <p>dashboard</p> }],
+    });
+
+    const button = await screen.findByRole('button', { name: 'Show me my first price' });
+    fireEvent.click(button);
+
+    await waitFor(() => {
+      expect(jobBodies).toHaveLength(3);
+    });
+    expect(jobBodies.map((body) => body.type)).toEqual([
+      'scrape.competitor_rates',
+      'ingest.events',
+      'engine.generate_recommendations',
+    ]);
+    expect(jobBodies[0].payload).toEqual({ city: 'Sibiu', property_id: PROPERTY_ID });
+    expect(jobBodies[1].payload).toEqual({ city: 'Sibiu' });
+    expect(jobBodies[2].payload).toEqual({ property_id: PROPERTY_ID, horizon_days: 90 });
+
+    // Once the pipeline succeeds, the step polls for a pending
+    // recommendation; the mocked GET .../recommendations starts returning it.
+    recommendationRows = [firstRecommendation];
+
+    expect(
+      await screen.findByText('August is peak season in Sibiu.', {}, { timeout: 6000 }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/399,00\sRON/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /looks good — take me in/i }));
+    expect(await screen.findByText('dashboard')).toBeInTheDocument();
+  });
+
+  it('shows an already-generated recommendation immediately on a resumed session', async () => {
+    propertyRows = [resolvedWithRooms];
+    competitorRows = discoveredCompetitors;
+    recommendationRows = [firstRecommendation];
+    renderWithProviders(<SetupWizard />);
+
+    expect(await screen.findByText('August is peak season in Sibiu.')).toBeInTheDocument();
+    expect(screen.getByText(/399,00\sRON/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Show me my first price' })).not.toBeInTheDocument();
+  });
+
+  it('a failing job stops the pipeline and shows the failed state with a retry', async () => {
+    propertyRows = [resolvedWithRooms];
+    competitorRows = discoveredCompetitors;
+    recommendationRows = [];
+    fetchMock.mockImplementation(async (input, init) => {
+      const url =
+        typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      const method = init?.method ?? 'GET';
+      if (method === 'GET' && url.endsWith('/properties')) return jsonResponse(propertyRows);
+      if (method === 'GET' && url.includes('/competitors')) return jsonResponse(competitorRows);
+      if (method === 'GET' && url.includes('/recommendations')) return jsonResponse(recommendationRows);
+      if (method === 'POST' && url.endsWith('/jobs')) {
+        const body = JSON.parse(String(init?.body)) as JobBody;
+        jobBodies.push(body);
+        if (jobBodies.length === 1) {
+          return jsonResponse({ error: 'boom' }, 500);
+        }
+        return jsonResponse(
+          { id: '00000000-0000-4000-8000-000000000001', type: body.type, status: 'queued', createdAt: new Date().toISOString() },
+          202,
+        );
+      }
+      throw new Error(`Unexpected fetch in test: ${method} ${url}`);
+    });
+
+    renderWithProviders(<SetupWizard />);
+    const button = await screen.findByRole('button', { name: 'Show me my first price' });
+    fireEvent.click(button);
+
+    expect(
+      await screen.findByText("We couldn't work out your first price just now."),
+    ).toBeInTheDocument();
+    expect(jobBodies).toHaveLength(1);
   });
 });
 

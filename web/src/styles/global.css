@@ -1573,6 +1573,48 @@ details.place-correction-toggle summary {
   margin-top: var(--space-5);
 }
 
+/* Step 4: discovered competitors (name + rating), read-only list */
+.discovered-list {
+  list-style: none;
+  padding: 0;
+  margin: var(--space-5) 0;
+  display: grid;
+  gap: var(--space-3);
+}
+
+.discovered-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-3);
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+}
+
+.discovered-item-name {
+  font-weight: 600;
+}
+
+.discovered-item-rating {
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+/* Step 5: the first recommendation, shown inline in the wizard */
+.setup-first-price {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-5);
+}
+
+.setup-first-price .btn {
+  margin-top: var(--space-3);
+  justify-self: start;
+}
+
 .setup-skip {
   display: block;
   margin: var(--space-6) auto 0;

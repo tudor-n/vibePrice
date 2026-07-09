@@ -55,7 +55,18 @@ export function DashboardPage({ nowHour = new Date().getHours() }: DashboardPage
   if (properties.isError) return <ErrorState error={properties.error} />;
   if (!property) {
     return (
-      <EmptyState message="Welcome to PricePilot. Add your first property in Settings and we will start watching prices for you." />
+      <div className="empty-card">
+        <img src={houseTerracotta} alt="" />
+        <h3>Let&apos;s set up your hotel</h3>
+        <p>
+          A few quick steps — your hotel name, your first room rate, and
+          we&apos;ll find your nearby competitors and work out your first
+          price recommendation.
+        </p>
+        <Link to="/setup" className="btn btn-primary">
+          Start setup →
+        </Link>
+      </div>
     );
   }
 

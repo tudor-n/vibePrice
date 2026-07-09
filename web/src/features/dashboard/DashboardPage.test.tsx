@@ -47,9 +47,11 @@ interface JobBody {
 
 const fetchMock = vi.fn<typeof fetch>();
 let jobBodies: JobBody[] = [];
+let propertyRows: Property[] = [];
 
 beforeEach(() => {
   jobBodies = [];
+  propertyRows = [property];
   vi.stubGlobal('fetch', fetchMock);
   fetchMock.mockImplementation(async (input, init) => {
     const url =
@@ -76,7 +78,7 @@ beforeEach(() => {
       return jsonResponse([fixtureRecommendation]);
     }
     if (url.endsWith('/properties')) {
-      return jsonResponse([property]);
+      return jsonResponse(propertyRows);
     }
     if (url.includes('/events')) {
       return jsonResponse([]);
@@ -209,5 +211,18 @@ describe('DashboardPage', () => {
       screen.getByRole('button', { name: /refresh data now/i }),
     ).toBeEnabled();
     expect(screen.queryByText(/refresh queued/i)).not.toBeInTheDocument();
+  });
+});
+
+describe('DashboardPage — no property yet', () => {
+  it('renders a "Let\'s set up your hotel" CTA linking to /setup', async () => {
+    propertyRows = [];
+    renderDashboard(9);
+
+    expect(
+      await screen.findByRole('heading', { name: "Let's set up your hotel" }),
+    ).toBeInTheDocument();
+    const link = screen.getByRole('link', { name: /start setup/i });
+    expect(link).toHaveAttribute('href', '/setup');
   });
 });

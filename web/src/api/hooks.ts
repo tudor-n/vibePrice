@@ -115,10 +115,22 @@ export function useResolveProperty() {
   });
 }
 
+export interface UseRecommendationsOptions {
+  /**
+   * Opt-in polling (e.g. the setup wizard waiting for the very first
+   * recommendation to land after triggering the pricing pipeline). Off by
+   * default — a property with zero *pending* recommendations is a normal,
+   * often permanent "all caught up" state on the Dashboard/Recommendations
+   * pages, not a transient one worth polling forever.
+   */
+  poll?: boolean;
+}
+
 export function useRecommendations(
   propertyId: string | undefined,
   from?: string,
   to?: string,
+  options: UseRecommendationsOptions = {},
 ) {
   return useQuery({
     queryKey: ['recommendations', propertyId, from ?? null, to ?? null],
@@ -133,6 +145,7 @@ export function useRecommendations(
         `/properties/${propertyId}/recommendations${query ? `?${query}` : ''}`,
       );
     },
+    refetchInterval: options.poll ? 3000 : false,
   });
 }
 
@@ -155,6 +168,17 @@ export function useUpdateRecommendationStatus() {
   });
 }
 
+/**
+ * While a property has zero discovered competitors, the discover_competitors
+ * job (chain-enqueued from resolve_place, see shared/contracts/jobs.md) may
+ * simply not have landed yet. Poll every 3s so the setup wizard's step 4
+ * (and any other page reading this list) clears itself without a manual
+ * reload. Stops once at least one competitor is on record.
+ */
+export function competitorsRefetchInterval(competitors: Competitor[] | undefined): number | false {
+  return (competitors?.length ?? 0) === 0 ? 3000 : false;
+}
+
 export function useCompetitors(propertyId: string | undefined) {
   return useQuery({
     queryKey: ['competitors', propertyId],
@@ -163,6 +187,7 @@ export function useCompetitors(propertyId: string | undefined) {
       if (!propertyId) throw new Error('propertyId is required');
       return apiFetch<Competitor[]>(`/properties/${propertyId}/competitors`);
     },
+    refetchInterval: (query) => competitorsRefetchInterval(query.state.data),
   });
 }
 

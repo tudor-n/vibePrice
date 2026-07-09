@@ -5,12 +5,13 @@
  * lands the owner back where they left off.
  */
 
-import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSetupProgress } from './useSetupProgress';
 import { StepName } from './steps/StepName';
 import { StepConfirmPlace } from './steps/StepConfirmPlace';
 import { StepRoom } from './steps/StepRoom';
+import { StepCompetitors } from './steps/StepCompetitors';
+import { StepFirstPrices } from './steps/StepFirstPrices';
 import { ErrorState, LoadingState } from '../../components/States';
 
 const TOTAL_STEPS = 5;
@@ -33,29 +34,6 @@ function ProgressDots({ current }: { current: number }) {
   );
 }
 
-/**
- * Steps ④–⑤ (competitor discovery + launch) are a LATER task. This is a
- * deliberate placeholder — do not build the real step here.
- */
-function StepCompetitorsPlaceholder() {
-  const headingRef = useRef<HTMLHeadingElement>(null);
-  useEffect(() => {
-    headingRef.current?.focus();
-  }, []);
-
-  return (
-    <div className="setup-step">
-      <h1 ref={headingRef} tabIndex={-1}>
-        Finding your competitors…
-      </h1>
-      <p className="page-intro">
-        This step is still being built. Head to your dashboard for now — we
-        will pick up onboarding here next time.
-      </p>
-    </div>
-  );
-}
-
 export function SetupWizard() {
   const navigate = useNavigate();
   const { properties, step, property } = useSetupProgress();
@@ -71,9 +49,12 @@ export function SetupWizard() {
     content = <StepConfirmPlace property={property} />;
   } else if (step === 3 && property) {
     content = <StepRoom property={property} />;
-  } else {
-    // step 4 (and the not-reachable 5/'done') — competitor discovery lands later.
-    content = <StepCompetitorsPlaceholder />;
+  } else if (step === 4 && property) {
+    content = <StepCompetitors property={property} />;
+  } else if (property) {
+    // step 5 (and the not-reachable 'done', which only exists as a
+    // transient client-side value once the owner leaves the wizard).
+    content = <StepFirstPrices property={property} />;
   }
 
   const currentDot = typeof step === 'number' ? step : TOTAL_STEPS;
