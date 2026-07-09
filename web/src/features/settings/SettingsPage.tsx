@@ -7,6 +7,7 @@ import {
   useProperties,
   useResolveProperty,
 } from '../../api/hooks';
+import { clearSetupDismissed } from '../../app/setupState';
 import { AsyncStatus } from '../../components/AsyncStatus';
 import { Money } from '../../components/Money';
 import { PlacePicker } from '../../components/PlacePicker';
@@ -89,7 +90,11 @@ function PropertyCard({ property }: { property: Property }) {
       {property.roomTypes.length === 0 ? (
         <EmptyState
           message="You haven't added a room type yet."
-          action={{ label: 'Add a room type', to: '/setup' }}
+          action={{
+            label: 'Add a room type',
+            to: '/setup',
+            onClick: () => clearSetupDismissed(),
+          }}
         />
       ) : (
         <table className="data-table">

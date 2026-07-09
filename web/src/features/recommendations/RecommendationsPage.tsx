@@ -5,6 +5,7 @@ import {
   useUpdateRecommendationStatus,
 } from '../../api/hooks';
 import { useSelectedProperty } from '../../app/PropertyContext';
+import { clearSetupDismissed } from '../../app/setupState';
 import type { Recommendation } from '../../api/types';
 import { EmptyState, ErrorState, LoadingState } from '../../components/States';
 import { HandUnderline } from '../../components/icons';
@@ -88,7 +89,11 @@ export function RecommendationsPage() {
     return (
       <EmptyState
         message="You haven't set up a hotel yet."
-        action={{ label: 'Set up your hotel', to: '/setup' }}
+        action={{
+          label: 'Set up your hotel',
+          to: '/setup',
+          onClick: () => clearSetupDismissed(),
+        }}
       />
     );
   }

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useCompetitors, useUntrackCompetitor } from '../../api/hooks';
 import { useSelectedProperty } from '../../app/PropertyContext';
+import { clearSetupDismissed } from '../../app/setupState';
 import { FreshnessBadge } from '../../components/FreshnessBadge';
 import { Money } from '../../components/Money';
 import { EmptyState, ErrorState, LoadingState } from '../../components/States';
@@ -127,7 +128,11 @@ export function CompetitorsPage() {
     return (
       <EmptyState
         message="You haven't set up a hotel yet."
-        action={{ label: 'Set up your hotel', to: '/setup' }}
+        action={{
+          label: 'Set up your hotel',
+          to: '/setup',
+          onClick: () => clearSetupDismissed(),
+        }}
       />
     );
   }

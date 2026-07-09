@@ -1,6 +1,6 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { EmptyState, ErrorState, LoadingState } from './States';
 
 function renderWithRouter(ui: React.ReactNode) {
@@ -41,5 +41,17 @@ describe('EmptyState', () => {
     const link = screen.getByRole('link', { name: 'Set up your hotel' });
     expect(link).toHaveAttribute('href', '/setup');
     expect(link).toHaveClass('btn', 'btn-primary');
+  });
+
+  it('fires the action onClick when the button-link is clicked (for /setup guard-clearing)', () => {
+    const onClick = vi.fn();
+    renderWithRouter(
+      <EmptyState
+        message="You haven't set up a hotel yet."
+        action={{ label: 'Set up your hotel', to: '/setup', onClick }}
+      />,
+    );
+    fireEvent.click(screen.getByRole('link', { name: 'Set up your hotel' }));
+    expect(onClick).toHaveBeenCalledTimes(1);
   });
 });

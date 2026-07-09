@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { SettingsPage } from './SettingsPage';
+import { dismissSetup, isSetupDismissed } from '../../app/setupState';
 import { renderWithProviders } from '../../test/renderWithProviders';
 import type { Property } from '../../api/types';
 
@@ -232,6 +233,20 @@ describe('SettingsPage — room types', () => {
     expect(screen.getByText("You haven't added a room type yet.")).toBeInTheDocument();
     const link = screen.getByRole('link', { name: /add a room type/i });
     expect(link).toHaveAttribute('href', '/setup');
+  });
+
+  it('clears the setup-dismissed flag when "Add a room type" is clicked (so SetupGuard does not bounce /setup)', async () => {
+    // Regression guard for the returning-owner dead end: SetupGuard sends
+    // /setup → / whenever the dismissed flag is set (every owner past
+    // onboarding), so the /setup action must clear it, like DashboardPage's
+    // links do. Concretely reachable via a second property added in Settings.
+    dismissSetup();
+    propertyRows = [resolvedProperty];
+    renderWithProviders(<SettingsPage />);
+    await screen.findByText('Strada Nicolae Bălcescu 12, Sibiu');
+
+    fireEvent.click(screen.getByRole('link', { name: /add a room type/i }));
+    expect(isSetupDismissed()).toBe(false);
   });
 });
 

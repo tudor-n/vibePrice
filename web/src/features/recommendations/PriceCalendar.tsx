@@ -1,8 +1,9 @@
 /**
  * Month price calendar (design handoff screen 3): one cell per night with the
- * server's price, the competitor band caption and a position marker colored
- * by where the price sits in the band. Days with a pending recommendation are
- * buttons that jump to the matching card below. No animation — by design.
+ * server's price, the nearby-hotels price-range caption and a position marker
+ * colored by where the price sits in that range. Days with a pending
+ * recommendation are buttons that jump to the matching card below. No
+ * animation — by design.
  *
  * All derivation lives in calendarModel.ts (pure, unit-tested); this file is
  * presentation only.

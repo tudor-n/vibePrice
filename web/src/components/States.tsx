@@ -26,6 +26,14 @@ export function ErrorState({ error: _error }: { error: unknown }) {
 export interface EmptyStateAction {
   label: string;
   to: string;
+  /**
+   * Optional side-effect fired on click, before navigation. Needed for
+   * `/setup` links: SetupGuard bounces /setup → / whenever the
+   * setup-dismissed flag is set (every owner past onboarding), so those
+   * call sites pass `onClick={() => clearSetupDismissed()}` to un-bounce
+   * themselves — mirroring DashboardPage's /setup links.
+   */
+  onClick?: () => void;
 }
 
 export function EmptyState({
@@ -39,7 +47,7 @@ export function EmptyState({
     <div className="state state-empty">
       <p>{message}</p>
       {action && (
-        <Link to={action.to} className="btn btn-primary">
+        <Link to={action.to} className="btn btn-primary" onClick={action.onClick}>
           {action.label}
         </Link>
       )}
