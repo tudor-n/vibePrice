@@ -25,6 +25,23 @@ test('failed phase shows retry immediately; done shows done text', () => {
   expect(screen.getByText('Found it ✓')).toBeInTheDocument();
 });
 
+test('failed phase uses the default copy, or a caller override when given', () => {
+  const { rerender } = render(<AsyncStatus phase="failed" workingText="w" />);
+  expect(screen.getByText("We couldn't reach Google just now.")).toBeInTheDocument();
+
+  rerender(
+    <AsyncStatus
+      phase="failed"
+      workingText="w"
+      failedText="We couldn't refresh your prices just now."
+    />,
+  );
+  expect(
+    screen.getByText("We couldn't refresh your prices just now."),
+  ).toBeInTheDocument();
+  expect(screen.queryByText("We couldn't reach Google just now.")).not.toBeInTheDocument();
+});
+
 test('status region is announced to screen readers', () => {
   render(<AsyncStatus phase="working" workingText="Finding…" />);
   expect(screen.getByRole('status')).toHaveTextContent('Finding…');

@@ -14,6 +14,7 @@ export interface AsyncStatusProps {
   workingText: string;
   doneText?: string;
   slowText?: string;
+  failedText?: string;
   timeoutMs?: number;
   onRetry?: () => void;
   onBackground?: () => void;
@@ -21,10 +22,11 @@ export interface AsyncStatusProps {
 
 const DEFAULT_SLOW =
   'This is taking longer than usual. The setup service may not be running.';
+const DEFAULT_FAILED = "We couldn't reach Google just now.";
 
 export function AsyncStatus({
   phase, workingText, doneText, slowText = DEFAULT_SLOW,
-  timeoutMs = 20000, onRetry, onBackground,
+  failedText = DEFAULT_FAILED, timeoutMs = 20000, onRetry, onBackground,
 }: AsyncStatusProps) {
   const [slow, setSlow] = useState(false);
 
@@ -40,7 +42,7 @@ export function AsyncStatus({
   if (phase === 'failed') {
     return (
       <div className="async-status async-status-failed" role="alert">
-        <p>We couldn't reach Google just now.</p>
+        <p>{failedText}</p>
         {onRetry && <button type="button" className="btn btn-secondary" onClick={onRetry}>Try again</button>}
       </div>
     );
