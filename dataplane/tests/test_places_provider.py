@@ -6,24 +6,26 @@ network call.
 """
 
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
 
-from pricepilot.places import PlaceCandidate, get_places_provider
+import pricepilot.places
+from pricepilot.places import PLACES_FIXTURE_DIR, PlaceCandidate, get_places_provider
 from pricepilot.places.fixture import FixtureAdapter
 from pricepilot.places.google import GoogleAdapter
 
 
-def test_fixture_text_search_returns_candidates(fixtures_dir):
-    provider = FixtureAdapter(fixtures_dir / "places")
+def test_fixture_text_search_returns_candidates():
+    provider = FixtureAdapter(PLACES_FIXTURE_DIR)
     results = provider.text_search("Continental Forum", city="sibiu")
     assert results[0].place_id
     assert isinstance(results[0].latitude, Decimal)
     assert results[0].rating is None or isinstance(results[0].rating, Decimal)
 
 
-def test_google_adapter_parses_text_search_without_network(fixtures_dir):
-    payload = (fixtures_dir / "places" / "text_search_continental.json").read_text()
+def test_google_adapter_parses_text_search_without_network():
+    payload = (PLACES_FIXTURE_DIR / "text_search_continental.json").read_text()
 
     def fake_get(url: str) -> str:  # injected; no network
         return payload
@@ -34,8 +36,8 @@ def test_google_adapter_parses_text_search_without_network(fixtures_dir):
     assert results[0].rating == Decimal("4.4")
 
 
-def test_fixture_nearby_returns_three_lodging_candidates(fixtures_dir):
-    provider = FixtureAdapter(fixtures_dir / "places")
+def test_fixture_nearby_returns_three_lodging_candidates():
+    provider = FixtureAdapter(PLACES_FIXTURE_DIR)
     results = provider.nearby(Decimal("45.79"), Decimal("24.15"), radius_m=1500)
     assert len(results) == 3
     for candidate in results:
@@ -45,22 +47,22 @@ def test_fixture_nearby_returns_three_lodging_candidates(fixtures_dir):
         assert candidate.formatted_address
 
 
-def test_fixture_details_finds_candidate_by_place_id(fixtures_dir):
-    provider = FixtureAdapter(fixtures_dir / "places")
+def test_fixture_details_finds_candidate_by_place_id():
+    provider = FixtureAdapter(PLACES_FIXTURE_DIR)
     first = provider.text_search("Continental Forum", city="sibiu")[0]
     found = provider.details(first.place_id)
     assert found.place_id == first.place_id
     assert found.name == first.name
 
 
-def test_fixture_details_unknown_place_id_raises_key_error(fixtures_dir):
-    provider = FixtureAdapter(fixtures_dir / "places")
+def test_fixture_details_unknown_place_id_raises_key_error():
+    provider = FixtureAdapter(PLACES_FIXTURE_DIR)
     with pytest.raises(KeyError):
         provider.details("does-not-exist")
 
 
-def test_google_adapter_nearby_without_network(fixtures_dir):
-    payload = (fixtures_dir / "places" / "nearby_lodging_sibiu.json").read_text()
+def test_google_adapter_nearby_without_network():
+    payload = (PLACES_FIXTURE_DIR / "nearby_lodging_sibiu.json").read_text()
     calls: list[str] = []
 
     def fake_get(url: str) -> str:  # injected; no network
@@ -75,8 +77,8 @@ def test_google_adapter_nearby_without_network(fixtures_dir):
     assert "nearbysearch" in calls[0]
 
 
-def test_google_adapter_details_without_network(fixtures_dir):
-    payload = (fixtures_dir / "places" / "text_search_continental.json").read_text()
+def test_google_adapter_details_without_network():
+    payload = (PLACES_FIXTURE_DIR / "text_search_continental.json").read_text()
     body = __import__("json").loads(payload)
     details_payload = __import__("json").dumps({"result": body["results"][0]})
 
@@ -124,6 +126,16 @@ def test_get_places_provider_defaults_to_fixture_adapter():
     # Default settings (PLACES_PROVIDER unset) must never call live Google.
     provider = get_places_provider()
     assert isinstance(provider, FixtureAdapter)
+
+
+def test_default_fixtures_ship_inside_the_installed_package():
+    # The Docker image pip-installs the package WITHOUT the repo checkout, so
+    # the default provider's fixture data must resolve inside the package —
+    # a repo-layout-relative path 404s at runtime (resolve_place job crash).
+    package_dir = Path(pricepilot.places.__file__).resolve().parent
+    assert PLACES_FIXTURE_DIR.is_relative_to(package_dir)
+    results = FixtureAdapter(PLACES_FIXTURE_DIR).text_search("Continental Forum", city="sibiu")
+    assert results, "packaged fixtures must load without the tests/ tree"
 
 
 def test_google_adapter_text_search_raises_on_non_ok_status():

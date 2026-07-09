@@ -26,6 +26,12 @@ dev = [
 [tool.setuptools.packages.find]
 where = ["src"]
 
+# The Docker image pip-installs from src/ only; the fixture places provider
+# (default, PLACES_PROVIDER=fixture) reads these JSONs at runtime. Removing
+# this stanza breaks resolve_place/discover_competitors in the container.
+[tool.setuptools.package-data]
+"pricepilot.places" = ["fixtures/*.json"]
+
 [tool.ruff]
 line-length = 100
 src = ["src", "tests"]

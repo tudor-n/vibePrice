@@ -12,8 +12,10 @@ from pricepilot.places.google import GoogleAdapter
 from pricepilot.places.models import PlaceCandidate
 from pricepilot.places.provider import PlacesProvider
 
-# src/pricepilot/places/__init__.py -> parents[3] == dataplane/
-_FIXTURE_DIR = Path(__file__).resolve().parents[3] / "tests" / "fixtures" / "places"
+# Demo fixtures ship inside the package (pyproject package-data): the Docker
+# image pip-installs without the repo checkout, so any repo-relative path
+# would not exist at runtime.
+PLACES_FIXTURE_DIR = Path(__file__).resolve().parent / "fixtures"
 
 
 def get_places_provider() -> PlacesProvider:
@@ -22,7 +24,7 @@ def get_places_provider() -> PlacesProvider:
         if not settings.google_places_api_key:
             raise RuntimeError("PLACES_PROVIDER=google requires GOOGLE_PLACES_API_KEY")
         return GoogleAdapter(settings.google_places_api_key)
-    return FixtureAdapter(_FIXTURE_DIR)
+    return FixtureAdapter(PLACES_FIXTURE_DIR)
 
 
-__all__ = ["PlaceCandidate", "PlacesProvider", "get_places_provider"]
+__all__ = ["PLACES_FIXTURE_DIR", "PlaceCandidate", "PlacesProvider", "get_places_provider"]

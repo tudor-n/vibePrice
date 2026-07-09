@@ -180,7 +180,11 @@ def test_city_scope_is_case_insensitive(session: Session) -> None:
     result = handle_scrape_competitor_rates(
         session, {"city": "SIBIU", "property_id": None}, client=FakeClient()
     )
-    assert result["rates_written"] == 3 * DAYS
+    # City scope sweeps every sibiu competitor, and the dev DB may hold extras
+    # beyond the demo world's (wizard-discovered ones) — so pin the assertion
+    # to the demo competitors: uppercase "SIBIU" must still reach all three.
+    assert result["rates_written"] >= 3 * DAYS
+    assert _appended_rate_count(session) == 3 * DAYS
 
 
 def test_unknown_scope_writes_nothing_and_creates_no_run(session: Session) -> None:

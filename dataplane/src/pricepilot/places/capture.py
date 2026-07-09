@@ -3,7 +3,8 @@
 Mirrors ``pricepilot.scrapers.capture``: a person runs this manually against
 the live Google Places API (real key, real billing) when a fixture needs
 refreshing, then trims/reviews the saved JSON before committing it under
-``tests/fixtures/places/``. Never run in CI and never imported by tests.
+``src/pricepilot/places/fixtures/`` (packaged — the demo provider reads it at
+runtime). Never run in CI and never imported by tests.
 
 Usage (needs GOOGLE_PLACES_API_KEY; PLACES_PROVIDER is irrelevant here — this
 CLI always calls Google directly, independent of the configured provider):
@@ -21,9 +22,10 @@ from urllib.parse import urlencode
 from urllib.request import urlopen
 
 from pricepilot.config import get_settings
+from pricepilot.places import PLACES_FIXTURE_DIR
 from pricepilot.places.google import _DETAILS, _NEARBY, _TEXT
 
-_OUT_DIR = Path(__file__).resolve().parents[3] / "tests" / "fixtures" / "places"
+_OUT_DIR = PLACES_FIXTURE_DIR
 
 
 def _slug(text: str) -> str:

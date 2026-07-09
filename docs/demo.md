@@ -84,16 +84,16 @@ so demo and tests never bill Google.
    $env:PLACES_PROVIDER = "fixture"   # default; explicit here for clarity
    .venv\Scripts\python -m pricepilot.scheduler.main
    ```
-   With `PLACES_PROVIDER=fixture`, `resolve_place` replays
-   `tests/fixtures/places/text_search_continental.json` (auto-picks "Hotel
+   With `PLACES_PROVIDER=fixture`, `resolve_place` replays the packaged
+   `src/pricepilot/places/fixtures/text_search_continental.json` (auto-picks "Hotel
    Continental Forum Sibiu", ★4.4, 1280 reviews) instead of calling Google.
 4. Back in **Settings**, the property card flips from "Finding your place on
    Google…" to the resolved state: address, **★4.4 (1280 reviews)**, and a map-pin
    coordinate chip. If the auto-pick were wrong, "Not the right place?" reveals the
    other stashed candidate ("Hotel Continental") to pick instead, or a free-text
    "Search by a different name" box that re-enqueues `resolve_place`.
-5. The chained `discover_competitors` job replays
-   `tests/fixtures/places/nearby_lodging_sibiu.json` (`nearby(lat, lng,
+5. The chained `discover_competitors` job replays the packaged
+   `src/pricepilot/places/fixtures/nearby_lodging_sibiu.json` (`nearby(lat, lng,
    kind="lodging")`) and upserts three nearby hotels as tracked competitors —
    no manual competitor entry exists anymore.
 6. Open the **Competitors** page: it now lists the discovered lodging (Hotel

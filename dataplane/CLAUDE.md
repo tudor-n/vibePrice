@@ -14,6 +14,7 @@ backend only through PostgreSQL and the `jobs` table (`shared/contracts/`).
 | `src/pricepilot/db/schema_check.py` | drift diff: mappings vs reflected DB schema (CI-enforced) |
 | `src/pricepilot/scrapers/` | per-OTA scraper modules + `SCRAPERS` registry |
 | `src/pricepilot/ingest/` | events, holidays, INS tourism stats, weather |
+| `src/pricepilot/places/` | Google Places provider seam: `GoogleAdapter` (live) / `FixtureAdapter` (default; reads packaged `places/fixtures/*.json` — ships in the image) |
 | `src/pricepilot/engine/rules/` | pure pricing rules, ordered in `RULES` |
 | `src/pricepilot/engine/pipeline.py` | combines rule adjustments into a price |
 | `src/pricepilot/engine/explainer.py` | builds the `factors` JSON (contract shape) |

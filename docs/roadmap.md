@@ -128,7 +128,7 @@ proximity" vision — the data foundation the later pricing rules build on.
 - [x] **Provider seam (dataplane)**: `pricepilot/places/` — `PlacesProvider`
   protocol (`text_search`/`details`/`nearby`), `GoogleAdapter` (live, keyed by
   `GOOGLE_PLACES_API_KEY`, never called in tests) and `FixtureAdapter`
-  (replays `tests/fixtures/places/*.json`); provider chosen by
+  (replays packaged `src/pricepilot/places/fixtures/*.json`); provider chosen by
   `PLACES_PROVIDER` (default `fixture` — no live call without opt-in);
   coordinates/ratings parsed straight to `Decimal` at the adapter boundary;
   human-in-the-loop `capture` CLI mirrors the scraper one.

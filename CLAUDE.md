@@ -57,7 +57,9 @@ cd web      && npm test && npm run build
    with every amount.
 3. **Prices are the product.** Engine rules are pure functions with unit tests for
    boundaries. A recommendation without a complete `factors` payload is a bug.
-4. **Scrapers never run against live sites in tests.** Fixtures only (`dataplane/tests/fixtures/`).
+4. **Scrapers never run against live sites in tests.** Fixtures only — scraper HTML in
+   `dataplane/tests/fixtures/`, places JSON packaged at `dataplane/src/pricepilot/places/fixtures/`
+   (shipped in the image; the default fixture provider reads it at runtime).
 5. **No cross-runtime calls.** Backend and dataplane communicate via the DB and jobs table only.
 6. **12-factor config.** All config from environment variables; secrets never committed.
    `.env.example` documents every variable.
