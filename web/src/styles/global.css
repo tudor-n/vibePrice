@@ -1408,6 +1408,119 @@ details.place-correction-toggle summary {
   white-space: nowrap;
 }
 
+/* --- Shared UX primitives: AsyncStatus, Explainer, PlacePicker ----------- */
+
+.async-status {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.async-status p {
+  margin: 0;
+}
+
+.async-status-working {
+  padding: var(--space-4);
+  border-radius: var(--radius);
+  background: var(--color-neutral-chip-bg);
+  color: var(--color-text-muted);
+}
+
+.async-status-working::before {
+  content: '';
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: var(--space-2);
+  border: 2px solid var(--terracotta);
+  border-top-color: transparent;
+  border-radius: 50%;
+  vertical-align: -1px;
+  animation: async-status-spin 0.8s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .async-status-working::before {
+    animation: none;
+  }
+}
+
+@keyframes async-status-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.async-status-done {
+  padding: var(--space-4);
+  border-radius: var(--radius);
+  background: var(--color-positive-bg);
+  color: var(--color-positive);
+}
+
+.async-status-failed {
+  padding: var(--space-4);
+  border-radius: var(--radius);
+  background: var(--color-negative-bg);
+  color: var(--color-negative);
+  display: grid;
+  gap: var(--space-3);
+}
+
+.async-status-actions {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.explainer {
+  position: relative;
+  display: inline-flex;
+}
+
+.explainer-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1.5px solid var(--terracotta);
+  background: var(--bg-card);
+  color: var(--terracotta-ink);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: var(--text-base);
+  cursor: pointer;
+}
+
+.explainer-trigger:hover {
+  background: var(--terracotta-wash);
+}
+
+.explainer-popover {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + var(--space-2));
+  left: 0;
+  width: max-content;
+  max-width: 18rem;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius);
+  border: 1.5px solid var(--line);
+  background: var(--bg-card);
+  box-shadow: var(--shadow);
+  color: var(--color-text);
+  font-size: var(--text-base);
+  line-height: var(--leading);
+}
+
+.place-picker {
+  display: grid;
+  gap: var(--space-4);
+}
+
 /* --- Townscape animation (login hero ONLY — data screens have no animation) --- */
 
 @keyframes ts-cloud-drift-a {
