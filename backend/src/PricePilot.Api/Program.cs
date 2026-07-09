@@ -181,6 +181,7 @@ api.MapPropertyEndpoints();
 api.MapRecommendationEndpoints();
 api.MapEventEndpoints();
 api.MapJobEndpoints();
+api.MapPoiEndpoints();
 
 // Guarded startup migration: opt-in (docker compose sets Database__MigrateOnStartup=true)
 // so plain `dotnet run` works without a database listening.
@@ -203,6 +204,8 @@ if (app.Configuration.GetValue<bool>("Demo:SeedOnStartup"))
     {
         using var scope = app.Services.CreateScope();
         await scope.ServiceProvider.GetRequiredService<DemoSeeder>().SeedAsync();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await PoiSeeder.SeedAsync(db, default);
     }
 }
 

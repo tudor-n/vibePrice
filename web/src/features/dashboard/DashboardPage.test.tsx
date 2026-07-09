@@ -19,6 +19,8 @@ const property: Property = {
   id: '33333333-3333-4333-8333-333333333333',
   name: 'Casa Luca',
   city: 'Sibiu',
+  placeStatus: 'resolved',
+  placeCandidates: [],
   roomTypes: [
     {
       id: fixtureRecommendation.roomTypeId,
@@ -163,5 +165,49 @@ describe('DashboardPage', () => {
       ).toBeEnabled();
     });
     expect(screen.getByRole('status')).toHaveTextContent(/refresh queued/i);
+  });
+
+  it('a failing job in the refresh sequence stops it, shows the error, and re-enables', async () => {
+    fetchMock.mockImplementation(async (input, init) => {
+      const url =
+        typeof input === 'string'
+          ? input
+          : input instanceof URL
+            ? input.toString()
+            : input.url;
+      const method = init?.method ?? 'GET';
+      if (method === 'POST' && url.endsWith('/jobs')) {
+        const body = JSON.parse(String(init?.body)) as JobBody;
+        jobBodies.push(body);
+        // Second job (ingest.events) fails; the engine job must never fire.
+        if (jobBodies.length === 2) {
+          return jsonResponse({ error: 'boom' }, 500);
+        }
+        return jsonResponse(
+          { id: '00000000-0000-4000-8000-000000000001', type: body.type, status: 'queued', createdAt: new Date().toISOString() },
+          202,
+        );
+      }
+      if (url.includes('/recommendations')) return jsonResponse([fixtureRecommendation]);
+      if (url.endsWith('/properties')) return jsonResponse([property]);
+      if (url.includes('/events')) return jsonResponse([]);
+      throw new Error(`Unexpected fetch in test: ${method} ${url}`);
+    });
+
+    renderDashboard(9);
+    const button = await screen.findByRole('button', { name: /refresh data now/i });
+    fireEvent.click(button);
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+    });
+    expect(jobBodies.map((body) => body.type)).toEqual([
+      'scrape.competitor_rates',
+      'ingest.events', // failed here — the sequence stopped
+    ]);
+    expect(
+      screen.getByRole('button', { name: /refresh data now/i }),
+    ).toBeEnabled();
+    expect(screen.queryByText(/refresh queued/i)).not.toBeInTheDocument();
   });
 });

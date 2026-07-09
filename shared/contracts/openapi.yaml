@@ -51,7 +51,7 @@ paths:
                 type: array
                 items: { $ref: "#/components/schemas/Property" }
     post:
-      summary: Create a property
+      summary: Create a property. Enqueues a resolve_place job (see shared/contracts/jobs.md) so the new property is tied to a Google place asynchronously; the response reflects placeStatus "unresolved".
       requestBody:
         required: true
         content:
@@ -63,6 +63,44 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Property" }
+  /properties/{propertyId}/place:
+    patch:
+      summary: Pick a stored Google place candidate as the property's resolved place (owner correction)
+      parameters:
+        - { name: propertyId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PlacePick" }
+      responses:
+        "200":
+          description: Candidate's fields copied onto the property; placeStatus becomes "resolved"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Property" }
+        "400":
+          description: placeId is missing, or not among the property's stored placeCandidates
+        "404":
+          description: Property does not belong to the caller's tenant (indistinguishable from a nonexistent id)
+  /properties/{propertyId}/resolve-place:
+    post:
+      summary: Re-enqueue resolve_place for a property (owner-triggered retry, optionally with a search query override)
+      parameters:
+        - { name: propertyId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ResolvePlace" }
+      responses:
+        "202":
+          description: Queued
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Job" }
+        "404":
+          description: Property does not belong to the caller's tenant (indistinguishable from a nonexistent id)
   /properties/{propertyId}/recommendations:
     get:
       summary: Dated price recommendations for a property
@@ -96,7 +134,7 @@ paths:
         "200": { description: Updated }
   /properties/{propertyId}/competitors:
     get:
-      summary: Tracked competitors and their latest scraped rates
+      summary: Discovered, tracked competitors (excludes untracked ones) and their latest scraped rates
       parameters:
         - { name: propertyId, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
@@ -107,17 +145,15 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/Competitor" }
-    post:
-      summary: Track a new competitor
+  /competitors/{competitorId}:
+    delete:
+      summary: Untrack a discovered competitor (soft-delete; sets excludedAt, row is retained)
       parameters:
-        - { name: propertyId, in: path, required: true, schema: { type: string, format: uuid } }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/CompetitorCreate" }
+        - { name: competitorId, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
-        "201": { description: Created }
+        "204": { description: Untracked }
+        "404":
+          description: Competitor does not belong to the caller's tenant, or is already untracked (indistinguishable from a nonexistent id)
   /events:
     get:
       summary: Events for a city
@@ -133,6 +169,21 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/Event" }
+  /points-of-interest:
+    get:
+      summary: Points of interest for a city (public reference data, not tenant-scoped)
+      parameters:
+        - { name: city, in: query, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: "OK (empty array for an unknown city)"
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Poi" }
+        "400":
+          description: city is required
   /jobs:
     post:
       summary: Trigger a dataplane job (e.g. refresh now)
@@ -184,9 +235,39 @@ components:
         name: { type: string }
         city: { type: string }
         address: { type: string }
+        latitude: { type: number, nullable: true }
+        longitude: { type: number, nullable: true }
+        rating: { type: number, nullable: true }
+        ratingCount: { type: integer, nullable: true }
+        placeStatus:
+          type: string
+          enum: [unresolved, resolved, failed]
+          description: "Derived, not stored: resolved when placeResolvedAt is set, failed when the dataplane wrote the __failed__ sentinel, else unresolved. See shared/contracts/place-candidates.md."
+        placeCandidates:
+          type: array
+          items: { $ref: "#/components/schemas/PlaceCandidate" }
         roomTypes:
           type: array
           items: { $ref: "#/components/schemas/RoomType" }
+    PlaceCandidate:
+      type: object
+      properties:
+        placeId: { type: string }
+        name: { type: string }
+        formattedAddress: { type: string, nullable: true }
+        latitude: { type: number, nullable: true }
+        longitude: { type: number, nullable: true }
+        rating: { type: number, nullable: true }
+        ratingCount: { type: integer, nullable: true }
+    PlacePick:
+      type: object
+      required: [placeId]
+      properties:
+        placeId: { type: string, description: "Must match one of the property's stored placeCandidates" }
+    ResolvePlace:
+      type: object
+      properties:
+        query: { type: string, description: "Search text override; absent means use the property's name + city" }
     PropertyCreate:
       type: object
       required: [name, city]
@@ -220,10 +301,15 @@ components:
         createdAt: { type: string, format: date-time }
     Competitor:
       type: object
+      description: "Auto-discovered via Google Places; tracked competitors are created by the resolve_place job, never by the client."
       properties:
         id: { type: string, format: uuid }
         name: { type: string }
-        sourceUrl: { type: string }
+        sourceUrl: { type: string, nullable: true }
+        rating: { type: number, nullable: true }
+        ratingCount: { type: integer, nullable: true }
+        latitude: { type: number, nullable: true }
+        longitude: { type: number, nullable: true }
         latestRates:
           type: array
           items:
@@ -233,12 +319,6 @@ components:
               price: { type: number }
               currency: { type: string }
               capturedAt: { type: string, format: date-time }
-    CompetitorCreate:
-      type: object
-      required: [name, sourceUrl]
-      properties:
-        name: { type: string }
-        sourceUrl: { type: string, description: "OTA listing URL to scrape" }
     Event:
       type: object
       properties:
@@ -248,6 +328,16 @@ components:
         startDate: { type: string, format: date }
         endDate: { type: string, format: date }
         impactScore: { type: integer, minimum: 0, maximum: 100 }
+    Poi:
+      type: object
+      description: "City-scoped landmark reference data used by the proximity rule; not tenant-scoped."
+      properties:
+        id: { type: string, format: uuid }
+        city: { type: string }
+        name: { type: string }
+        latitude: { type: number }
+        longitude: { type: number }
+        weight: { type: integer, minimum: 0, maximum: 100 }
     Job:
       type: object
       properties:

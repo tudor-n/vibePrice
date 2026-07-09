@@ -11,8 +11,11 @@ import type {
   Job,
   JobCreate,
   LoginRequest,
+  PlacePick,
   Property,
+  PropertyCreate,
   Recommendation,
+  ResolvePlace,
 } from './types';
 
 export function useLogin() {
@@ -26,10 +29,76 @@ export function useLogin() {
   });
 }
 
+/**
+ * While any property is still `unresolved` (its resolve_place job hasn't
+ * landed yet), poll every 3s so the Settings page's "Finding your place on
+ * Google…" state clears itself without the owner refreshing the page.
+ * Stops once every property has settled (resolved or failed).
+ */
+export function propertiesRefetchInterval(properties: Property[] | undefined): number | false {
+  const anyUnresolved = properties?.some((property) => property.placeStatus === 'unresolved') ?? false;
+  return anyUnresolved ? 3000 : false;
+}
+
 export function useProperties() {
   return useQuery({
     queryKey: ['properties'],
     queryFn: () => apiFetch<Property[]>('/properties'),
+    refetchInterval: (query) => propertiesRefetchInterval(query.state.data),
+  });
+}
+
+export function useCreateProperty() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: PropertyCreate) =>
+      apiFetch<Property>('/properties', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['properties'] });
+    },
+  });
+}
+
+export interface PickPlaceInput {
+  propertyId: string;
+  placeId: string;
+}
+
+export function usePickPlace() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ propertyId, placeId }: PickPlaceInput) =>
+      apiFetch<Property>(`/properties/${propertyId}/place`, {
+        method: 'PATCH',
+        body: JSON.stringify({ placeId } satisfies PlacePick),
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['properties'] });
+    },
+  });
+}
+
+export interface ResolvePropertyInput {
+  propertyId: string;
+  /** Search text override; omit to use the property's name + city. */
+  query?: string;
+}
+
+export function useResolveProperty() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ propertyId, query }: ResolvePropertyInput) =>
+      apiFetch<Job>(`/properties/${propertyId}/resolve-place`, {
+        method: 'POST',
+        body: JSON.stringify({ query } satisfies ResolvePlace),
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['properties'] });
+      void queryClient.invalidateQueries({ queryKey: ['jobs'] });
+    },
   });
 }
 
@@ -80,6 +149,18 @@ export function useCompetitors(propertyId: string | undefined) {
     queryFn: () => {
       if (!propertyId) throw new Error('propertyId is required');
       return apiFetch<Competitor[]>(`/properties/${propertyId}/competitors`);
+    },
+  });
+}
+
+/** Untrack a discovered competitor (soft-delete; row stays for history). */
+export function useUntrackCompetitor() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (competitorId: string) =>
+      apiFetch<void>(`/competitors/${competitorId}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['competitors'] });
     },
   });
 }

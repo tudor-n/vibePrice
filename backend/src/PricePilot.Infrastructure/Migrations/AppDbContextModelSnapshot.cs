@@ -33,18 +33,62 @@ namespace PricePilot.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<DateTimeOffset?>("DiscoveredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("discovered_at");
+
+                    b.Property<string>("DiscoverySource")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("discovery_source");
+
+                    b.Property<DateTimeOffset?>("ExcludedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("excluded_at");
+
+                    b.Property<decimal?>("Latitude")
+                        .HasPrecision(9, 6)
+                        .HasColumnType("numeric(9,6)")
+                        .HasColumnName("latitude");
+
+                    b.Property<decimal?>("Longitude")
+                        .HasPrecision(9, 6)
+                        .HasColumnType("numeric(9,6)")
+                        .HasColumnName("longitude");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("name");
 
+                    b.Property<string>("PlaceCandidates")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("place_candidates");
+
+                    b.Property<string>("PlaceId")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("place_id");
+
+                    b.Property<DateTimeOffset?>("PlaceResolvedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("place_resolved_at");
+
                     b.Property<Guid>("PropertyId")
                         .HasColumnType("uuid")
                         .HasColumnName("property_id");
 
+                    b.Property<decimal?>("Rating")
+                        .HasPrecision(2, 1)
+                        .HasColumnType("numeric(2,1)")
+                        .HasColumnName("rating");
+
+                    b.Property<int?>("RatingCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("rating_count");
+
                     b.Property<string>("SourceUrl")
-                        .IsRequired()
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)")
                         .HasColumnName("source_url");
@@ -279,6 +323,52 @@ namespace PricePilot.Infrastructure.Migrations
                     b.ToTable("own_bookings", (string)null);
                 });
 
+            modelBuilder.Entity("PricePilot.Domain.PointOfInterest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("City")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("city");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<decimal>("Latitude")
+                        .HasPrecision(9, 6)
+                        .HasColumnType("numeric(9,6)")
+                        .HasColumnName("latitude");
+
+                    b.Property<decimal>("Longitude")
+                        .HasPrecision(9, 6)
+                        .HasColumnType("numeric(9,6)")
+                        .HasColumnName("longitude");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("name");
+
+                    b.Property<int>("Weight")
+                        .HasColumnType("integer")
+                        .HasColumnName("weight");
+
+                    b.HasKey("Id")
+                        .HasName("pk_points_of_interest");
+
+                    b.HasIndex("City")
+                        .HasDatabaseName("ix_points_of_interest_city");
+
+                    b.ToTable("points_of_interest", (string)null);
+                });
+
             modelBuilder.Entity("PricePilot.Domain.Property", b =>
                 {
                     b.Property<Guid>("Id")
@@ -301,11 +391,43 @@ namespace PricePilot.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<decimal?>("Latitude")
+                        .HasPrecision(9, 6)
+                        .HasColumnType("numeric(9,6)")
+                        .HasColumnName("latitude");
+
+                    b.Property<decimal?>("Longitude")
+                        .HasPrecision(9, 6)
+                        .HasColumnType("numeric(9,6)")
+                        .HasColumnName("longitude");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("name");
+
+                    b.Property<string>("PlaceCandidates")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("place_candidates");
+
+                    b.Property<string>("PlaceId")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("place_id");
+
+                    b.Property<DateTimeOffset?>("PlaceResolvedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("place_resolved_at");
+
+                    b.Property<decimal?>("Rating")
+                        .HasPrecision(2, 1)
+                        .HasColumnType("numeric(2,1)")
+                        .HasColumnName("rating");
+
+                    b.Property<int?>("RatingCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("rating_count");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")

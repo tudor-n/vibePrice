@@ -1,0 +1,51 @@
+{
+  "html_attributions": [],
+  "results": [
+    {
+      "place_id": "ChIJvS4Yt5DZskARvVjLl1yq0mA",
+      "name": "Hotel Împăratul Romanilor",
+      "vicinity": "Strada Nicolae Bălcescu 4, Sibiu",
+      "geometry": {
+        "location": {
+          "lat": 45.7967,
+          "lng": 24.1519
+        }
+      },
+      "rating": 4.3,
+      "user_ratings_total": 987,
+      "types": ["lodging", "point_of_interest", "establishment"],
+      "business_status": "OPERATIONAL"
+    },
+    {
+      "place_id": "ChIJyR8bQ0PZskARxKt5o3dQm8E",
+      "name": "Golden Tulip Ana Dora Sibiu",
+      "vicinity": "Calea Șurii Mici 12, Sibiu",
+      "geometry": {
+        "location": {
+          "lat": 45.8021,
+          "lng": 24.1611
+        }
+      },
+      "rating": 4.5,
+      "user_ratings_total": 1523,
+      "types": ["lodging", "point_of_interest", "establishment"],
+      "business_status": "OPERATIONAL"
+    },
+    {
+      "place_id": "ChIJq2Vd0kfZskARz1t8bYnW5oU",
+      "name": "Hotel Silva Sibiu",
+      "vicinity": "Aleea Mihail Guguianu 1, Sibiu",
+      "geometry": {
+        "location": {
+          "lat": 45.7801,
+          "lng": 24.1102
+        }
+      },
+      "rating": 4.1,
+      "user_ratings_total": 645,
+      "types": ["lodging", "point_of_interest", "establishment"],
+      "business_status": "OPERATIONAL"
+    }
+  ],
+  "status": "OK"
+}

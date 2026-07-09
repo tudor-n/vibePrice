@@ -65,7 +65,7 @@ string; never used at runtime).
   resolved) and `DemoSeeder` (writes the fixed cross-tenant demo world at startup).
 - Endpoints taking an id must verify ownership; the pattern used here is "look it up
   through the filtered context and 404 when absent" (see `RecommendationQueries.UpdateStatusAsync`,
-  `PropertyService.AddCompetitorAsync`).
+  `PropertyService.UntrackCompetitorAsync`).
 - New writes must set `TenantId` from `ITenantContext`, never from request bodies.
 - Real login exists: `POST /api/v1/auth/login` (anonymous, fixed-window rate limit
   10/min per IP) verifies credentials via `IAuthService` (Infrastructure, PBKDF2 through

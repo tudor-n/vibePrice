@@ -1,0 +1,36 @@
+{
+  "html_attributions": [],
+  "results": [
+    {
+      "place_id": "ChIJZ8h5jP7ZskARW2nO8f2X1qY",
+      "name": "Hotel Continental Forum Sibiu",
+      "formatted_address": "Calea Dumbrăvii 4, Sibiu 550324, Romania",
+      "geometry": {
+        "location": {
+          "lat": 45.7907,
+          "lng": 24.1367
+        }
+      },
+      "rating": 4.4,
+      "user_ratings_total": 1280,
+      "types": ["lodging", "point_of_interest", "establishment"],
+      "business_status": "OPERATIONAL"
+    },
+    {
+      "place_id": "ChIJf3W2t9jZskARu0m4bYQx7pM",
+      "name": "Hotel Continental",
+      "formatted_address": "Str. Mitropoliei 6, Sibiu 550179, Romania",
+      "geometry": {
+        "location": {
+          "lat": 45.7889,
+          "lng": 24.1401
+        }
+      },
+      "rating": 3.9,
+      "user_ratings_total": 342,
+      "types": ["lodging", "point_of_interest", "establishment"],
+      "business_status": "OPERATIONAL"
+    }
+  ],
+  "status": "OK"
+}

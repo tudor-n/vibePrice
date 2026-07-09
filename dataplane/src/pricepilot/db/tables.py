@@ -68,6 +68,13 @@ class Property(Base):
     tenant_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("tenants.id"))
     name: Mapped[str] = mapped_column(String(200))
     city: Mapped[str] = mapped_column(String(100))
+    place_id: Mapped[str | None] = mapped_column(String(300))
+    latitude: Mapped[Decimal | None] = mapped_column(Numeric(9, 6))
+    longitude: Mapped[Decimal | None] = mapped_column(Numeric(9, 6))
+    rating: Mapped[Decimal | None] = mapped_column(Numeric(2, 1))
+    rating_count: Mapped[int | None] = mapped_column(Integer)
+    place_resolved_at: Mapped[datetime | None]
+    place_candidates: Mapped[dict[str, Any] | None]  # JSONB (array); opaque
     created_at: Mapped[datetime]
 
 
@@ -91,7 +98,17 @@ class Competitor(Base):
     tenant_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("tenants.id"))
     property_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("properties.id"))
     name: Mapped[str] = mapped_column(String(200))
-    source_url: Mapped[str] = mapped_column(String(2000))
+    source_url: Mapped[str | None] = mapped_column(String(2000))
+    place_id: Mapped[str | None] = mapped_column(String(300))
+    latitude: Mapped[Decimal | None] = mapped_column(Numeric(9, 6))
+    longitude: Mapped[Decimal | None] = mapped_column(Numeric(9, 6))
+    rating: Mapped[Decimal | None] = mapped_column(Numeric(2, 1))
+    rating_count: Mapped[int | None] = mapped_column(Integer)
+    place_resolved_at: Mapped[datetime | None]
+    place_candidates: Mapped[dict[str, Any] | None]  # JSONB (array); opaque
+    discovered_at: Mapped[datetime | None]
+    discovery_source: Mapped[str | None] = mapped_column(String(50))
+    excluded_at: Mapped[datetime | None]
     created_at: Mapped[datetime]
 
 
@@ -134,6 +151,20 @@ class Event(Base):
     end_date: Mapped[date]
     impact_score: Mapped[int] = mapped_column(Integer)  # 0-100
     source: Mapped[str] = mapped_column(String(100))
+    created_at: Mapped[datetime] = mapped_column(default=_utcnow)
+
+
+class PointOfInterest(Base):
+    """City-scoped proximity reference — NOT tenant-scoped."""
+
+    __tablename__ = "points_of_interest"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    city: Mapped[str] = mapped_column(String(100))
+    name: Mapped[str] = mapped_column(String(300))
+    latitude: Mapped[Decimal] = mapped_column(Numeric(9, 6))
+    longitude: Mapped[Decimal] = mapped_column(Numeric(9, 6))
+    weight: Mapped[int] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(default=_utcnow)
 
 

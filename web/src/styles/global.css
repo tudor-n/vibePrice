@@ -1330,6 +1330,79 @@ button.cal-cell:hover {
   margin-top: var(--space-5);
 }
 
+/* --- Google place resolution (Settings) ---------------------------------- */
+
+.place-summary {
+  display: grid;
+  gap: 6px;
+  margin: var(--space-3) 0;
+}
+
+.place-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--color-neutral-chip-bg);
+  color: var(--color-neutral-chip);
+  font-size: var(--text-caption);
+  width: fit-content;
+}
+
+.place-correction {
+  display: grid;
+  gap: var(--space-4);
+  margin-top: var(--space-3);
+}
+
+fieldset.field {
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+fieldset.field legend {
+  padding: 0;
+  font-weight: 600;
+  font-size: var(--text-base);
+  color: #4a4034;
+}
+
+.candidate-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 0;
+  font-weight: 400;
+  min-height: 44px;
+}
+
+.candidate-option input[type='radio'] {
+  margin-top: 4px;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+details.place-correction-toggle summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--terracotta-ink);
+  padding: var(--space-2) 0;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+
+.untrack-confirm {
+  margin-top: var(--space-3);
+}
+
+.untrack-confirm p {
+  margin: 0 0 var(--space-3);
+}
+
 .money {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
