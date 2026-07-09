@@ -115,7 +115,8 @@ public sealed class RoomTypeCreateTests : IDisposable
     [InlineData(0, 350.0, "RON")]        // capacity < 1
     [InlineData(2, 0.0, "RON")]          // price <= 0
     [InlineData(2, 350.005, "RON")]      // > 2 decimals
-    [InlineData(2, 350.0, "RONI")]       // bad currency
+    [InlineData(2, 350.0, "RONI")]       // bad currency (too long)
+    [InlineData(2, 350.0, "12A")]        // bad currency (3 chars, not all letters)
     public async Task Create_room_type_validation_returns_400(int capacity, double basePrice, string currency)
     {
         var client = CreateTenantClient(_tenantA);

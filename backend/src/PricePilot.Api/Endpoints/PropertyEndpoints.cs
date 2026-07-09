@@ -48,11 +48,11 @@ public static class PropertyEndpoints
                 return Results.BadRequest(new { error = "basePrice must be > 0 with at most 2 decimals" });
             if (dto.CurrentPrice is { } cp && (cp <= 0 || decimal.Round(cp, 2) != cp))
                 return Results.BadRequest(new { error = "currentPrice must be > 0 with at most 2 decimals" });
-            if (dto.Currency is { } cur && cur.Length != 3)
+            if (dto.Currency is { } cur && (cur.Length != 3 || !cur.All(char.IsAsciiLetter)))
                 return Results.BadRequest(new { error = "currency must be a 3-letter code" });
 
             var created = await properties.AddRoomTypeAsync(propertyId, dto, ct);
-            return created is null ? Results.NotFound() : Results.Created($"/api/v1/properties/{propertyId}/room-types", created);
+            return created is null ? Results.NotFound() : Results.Created($"/api/v1/properties/{propertyId}/room-types/{created.Id}", created);
         });
 
         group.MapGet("/{propertyId:guid}/competitors", async (
