@@ -5,6 +5,7 @@ import { useSelectedProperty } from '../../app/PropertyContext';
 import { clearSetupDismissed, isSetupDismissed } from '../setup/setupState';
 import { getActiveSession } from '../../auth/session';
 import { formatMoney } from '../../components/Money';
+import { AsyncStatus, type AsyncPhase } from '../../components/AsyncStatus';
 import { EmptyState, ErrorState, LoadingState } from '../../components/States';
 import { TownSilhouette } from '../../components/Townscape';
 import { Bunting, HandUnderline, IconRefresh } from '../../components/icons';
@@ -27,6 +28,53 @@ export function greetingForHour(hour: number): string {
   return 'Good evening';
 }
 
+/**
+ * Local progress through handleRefresh's three sequential jobs (see
+ * shared/contracts/jobs.md for the job types). 'rates' | 'events' | 'engine'
+ * name whichever job is currently in flight — the ones before it in
+ * REFRESH_STEP_LABELS have already resolved. 'done' / 'failed' are terminal.
+ */
+type RefreshStep = 'idle' | 'rates' | 'events' | 'engine' | 'done' | 'failed';
+
+const REFRESH_STEP_LABELS = ['Prices', "What's on", 'Recalculating'] as const;
+
+function refreshStepIndex(step: RefreshStep): number {
+  switch (step) {
+    case 'rates':
+      return 0;
+    case 'events':
+      return 1;
+    case 'engine':
+      return 2;
+    case 'done':
+      return REFRESH_STEP_LABELS.length;
+    default:
+      return -1; // 'idle' | 'failed' — nothing to tick yet
+  }
+}
+
+/**
+ * "Prices ✓ · What's on ✓ · Recalculating…" — ticks a step to ✓ once its
+ * mutateAsync call in handleRefresh has resolved, and marks the one
+ * currently in flight with an ellipsis. Pure so tests pin the exact copy.
+ */
+export function refreshStepsText(step: RefreshStep): string {
+  const currentIndex = refreshStepIndex(step);
+  return REFRESH_STEP_LABELS.map((label, index) => {
+    if (index < currentIndex) return `${label} ✓`;
+    if (index === currentIndex) return `${label}…`;
+    return label;
+  }).join(' · ');
+}
+
+/** Maps the refresh state machine onto AsyncStatus's phase prop. */
+function refreshStepPhase(step: RefreshStep): AsyncPhase | null {
+  if (step === 'idle') return null;
+  if (step === 'failed') return 'failed';
+  if (step === 'done') return 'done';
+  return 'working'; // 'rates' | 'events' | 'engine' — a job is in flight
+}
+
 interface DashboardPageProps {
   /** Local hour 0–23; injectable so tests are deterministic. */
   nowHour?: number;
@@ -43,9 +91,11 @@ export function DashboardPage({ nowHour = new Date().getHours() }: DashboardPage
   const recommendations = useRecommendations(property?.id, today, isoDate(horizon));
   const events = useEvents(property?.city, today, isoDate(horizon));
   const triggerJob = useTriggerJob();
-  // True from the first click until all three jobs are accepted (or one fails);
-  // the mutation's own isPending flickers off between the sequential calls.
-  const [refreshing, setRefreshing] = useState(false);
+  // Tracks progress through the three sequential jobs in handleRefresh so
+  // the owner sees real progress instead of a vague "queued".
+  const [refreshStep, setRefreshStep] = useState<RefreshStep>('idle');
+  const refreshPhase = refreshStepPhase(refreshStep);
+  const busy = refreshPhase === 'working';
 
   const firstName = getActiveSession()?.user.displayName.trim().split(/\s+/)[0];
   const greeting = firstName
@@ -85,8 +135,8 @@ export function DashboardPage({ nowHour = new Date().getHours() }: DashboardPage
   const needsSetup = property.placeStatus !== 'resolved' || property.roomTypes.length === 0;
 
   async function handleRefresh() {
-    if (!property || refreshing) return;
-    setRefreshing(true);
+    if (!property || busy) return;
+    setRefreshStep('rates');
     try {
       // The real pipeline, in dependency order (shared/contracts/jobs.md):
       // fresh competitor rates → fresh events → recompute recommendations.
@@ -94,22 +144,22 @@ export function DashboardPage({ nowHour = new Date().getHours() }: DashboardPage
         type: 'scrape.competitor_rates',
         payload: { city: property.city, property_id: property.id },
       });
+      setRefreshStep('events');
       await triggerJob.mutateAsync({
         type: 'ingest.events',
         payload: { city: property.city },
       });
+      setRefreshStep('engine');
       await triggerJob.mutateAsync({
         type: 'engine.generate_recommendations',
         payload: { property_id: property.id, horizon_days: 90 },
       });
+      setRefreshStep('done');
     } catch {
-      // The mutation state carries the error; the ErrorState below shows it.
-    } finally {
-      setRefreshing(false);
+      // The failed AsyncStatus below shows the error and offers Try again.
+      setRefreshStep('failed');
     }
   }
-
-  const busy = refreshing || triggerJob.isPending;
 
   const pending = (recommendations.data ?? []).filter((r) => r.status === 'pending');
 
@@ -140,7 +190,7 @@ export function DashboardPage({ nowHour = new Date().getHours() }: DashboardPage
           onClick={() => void handleRefresh()}
         >
           <IconRefresh />
-          {busy ? 'Refreshing…' : 'Refresh data now'}
+          {busy ? 'Refreshing…' : 'Check for new prices'}
         </button>
       </div>
       <HandUnderline width={188} />
@@ -155,12 +205,14 @@ export function DashboardPage({ nowHour = new Date().getHours() }: DashboardPage
           </Link>
         </p>
       )}
-      {triggerJob.isError && <ErrorState error={triggerJob.error} />}
-      {!busy && triggerJob.isSuccess && (
-        <p className="state state-loading" role="status">
-          Refresh queued — new competitor prices, events and recommendations
-          will appear shortly.
-        </p>
+      {refreshPhase && (
+        <AsyncStatus
+          phase={refreshPhase}
+          workingText={refreshStepsText(refreshStep)}
+          doneText={refreshStepsText('done')}
+          failedText="We couldn't refresh your prices just now."
+          onRetry={() => void handleRefresh()}
+        />
       )}
 
       <div className="card-grid">

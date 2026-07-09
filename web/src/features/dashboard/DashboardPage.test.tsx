@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
-import { DashboardPage, greetingForHour } from './DashboardPage';
+import { DashboardPage, greetingForHour, refreshStepsText } from './DashboardPage';
 import { SetupGuard } from '../setup/SetupGuard';
 import { dismissSetup, isSetupDismissed } from '../setup/setupState';
 import { PropertyProvider } from '../../app/PropertyContext';
@@ -41,6 +41,25 @@ function jsonResponse(payload: unknown, status = 200) {
     status,
     headers: { 'Content-Type': 'application/json' },
   });
+}
+
+/** A promise plus its resolve/reject, for tests that need to control exactly
+ * when a mocked fetch settles (so we can observe mid-sequence UI). */
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
+function queuedJobResponse(id: string, type: string) {
+  return jsonResponse(
+    { id, type, status: 'queued', createdAt: new Date().toISOString() },
+    202,
+  );
 }
 
 interface JobBody {
@@ -122,6 +141,17 @@ describe('greetingForHour', () => {
   });
 });
 
+describe('refreshStepsText', () => {
+  it('ticks each step to ✓ once its slot has resolved, shows … on the one in flight', () => {
+    expect(refreshStepsText('idle')).toBe("Prices · What's on · Recalculating");
+    expect(refreshStepsText('rates')).toBe("Prices… · What's on · Recalculating");
+    expect(refreshStepsText('events')).toBe("Prices ✓ · What's on… · Recalculating");
+    expect(refreshStepsText('engine')).toBe("Prices ✓ · What's on ✓ · Recalculating…");
+    expect(refreshStepsText('done')).toBe("Prices ✓ · What's on ✓ · Recalculating ✓");
+    expect(refreshStepsText('failed')).toBe("Prices · What's on · Recalculating");
+  });
+});
+
 describe('DashboardPage', () => {
   it('greets the signed-in owner by first name, time-of-day aware', async () => {
     renderDashboard(9);
@@ -142,7 +172,7 @@ describe('DashboardPage', () => {
 
   it('refresh enqueues the three pipeline jobs in order with their payloads', async () => {
     renderDashboard(9);
-    const button = await screen.findByRole('button', { name: /refresh data now/i });
+    const button = await screen.findByRole('button', { name: /check for new prices/i });
 
     fireEvent.click(button);
 
@@ -164,16 +194,68 @@ describe('DashboardPage', () => {
       horizon_days: 90,
     });
 
-    // Once all three are accepted the button settles and the owner is told.
+    // Once all three are accepted the button re-enables and the status
+    // region (a11y: role="status") shows every step ticked off.
     await waitFor(() => {
       expect(
-        screen.getByRole('button', { name: /refresh data now/i }),
+        screen.getByRole('button', { name: /check for new prices/i }),
       ).toBeEnabled();
     });
-    expect(screen.getByRole('status')).toHaveTextContent(/refresh queued/i);
+    expect(screen.getByRole('status')).toHaveTextContent(
+      "Prices ✓ · What's on ✓ · Recalculating ✓",
+    );
   });
 
-  it('a failing job in the refresh sequence stops it, shows the error, and re-enables', async () => {
+  it('shows the 3-step progress ticking to done as each job resolves in turn', async () => {
+    const jobDeferreds = [deferred<Response>(), deferred<Response>(), deferred<Response>()];
+    let callIndex = 0;
+    fetchMock.mockImplementation(async (input, init) => {
+      const url =
+        typeof input === 'string'
+          ? input
+          : input instanceof URL
+            ? input.toString()
+            : input.url;
+      const method = init?.method ?? 'GET';
+      if (method === 'POST' && url.endsWith('/jobs')) {
+        const body = JSON.parse(String(init?.body)) as JobBody;
+        jobBodies.push(body);
+        return jobDeferreds[callIndex++].promise;
+      }
+      if (url.includes('/recommendations')) return jsonResponse([fixtureRecommendation]);
+      if (url.endsWith('/properties')) return jsonResponse(propertyRows);
+      if (url.includes('/events')) return jsonResponse([]);
+      throw new Error(`Unexpected fetch in test: ${method} ${url}`);
+    });
+
+    renderDashboard(9);
+    fireEvent.click(await screen.findByRole('button', { name: /check for new prices/i }));
+
+    // Rates in flight; nothing else has started yet.
+    await waitFor(() => {
+      expect(screen.getByText("Prices… · What's on · Recalculating")).toBeInTheDocument();
+    });
+
+    jobDeferreds[0].resolve(queuedJobResponse('j1', 'scrape.competitor_rates'));
+    await waitFor(() => {
+      expect(screen.getByText("Prices ✓ · What's on… · Recalculating")).toBeInTheDocument();
+    });
+
+    jobDeferreds[1].resolve(queuedJobResponse('j2', 'ingest.events'));
+    await waitFor(() => {
+      expect(screen.getByText("Prices ✓ · What's on ✓ · Recalculating…")).toBeInTheDocument();
+    });
+
+    jobDeferreds[2].resolve(queuedJobResponse('j3', 'engine.generate_recommendations'));
+    await waitFor(() => {
+      expect(screen.getByText("Prices ✓ · What's on ✓ · Recalculating ✓")).toBeInTheDocument();
+    });
+    expect(
+      screen.getByRole('button', { name: /check for new prices/i }),
+    ).toBeEnabled();
+  });
+
+  it('a failing job in the refresh sequence stops it, shows the failed state, and re-enables', async () => {
     fetchMock.mockImplementation(async (input, init) => {
       const url =
         typeof input === 'string'
@@ -201,7 +283,7 @@ describe('DashboardPage', () => {
     });
 
     renderDashboard(9);
-    const button = await screen.findByRole('button', { name: /refresh data now/i });
+    const button = await screen.findByRole('button', { name: /check for new prices/i });
     fireEvent.click(button);
 
     await waitFor(() => {
@@ -211,10 +293,61 @@ describe('DashboardPage', () => {
       'scrape.competitor_rates',
       'ingest.events', // failed here — the sequence stopped
     ]);
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      "We couldn't refresh your prices just now.",
+    );
     expect(
-      screen.getByRole('button', { name: /refresh data now/i }),
+      screen.getByRole('button', { name: /check for new prices/i }),
     ).toBeEnabled();
-    expect(screen.queryByText(/refresh queued/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument();
+  });
+
+  it('"Try again" after a failure re-runs the whole refresh sequence from the start', async () => {
+    let eventsAlreadyFailedOnce = false;
+    fetchMock.mockImplementation(async (input, init) => {
+      const url =
+        typeof input === 'string'
+          ? input
+          : input instanceof URL
+            ? input.toString()
+            : input.url;
+      const method = init?.method ?? 'GET';
+      if (method === 'POST' && url.endsWith('/jobs')) {
+        const body = JSON.parse(String(init?.body)) as JobBody;
+        jobBodies.push(body);
+        if (body.type === 'ingest.events' && !eventsAlreadyFailedOnce) {
+          eventsAlreadyFailedOnce = true;
+          return jsonResponse({ error: 'boom' }, 500);
+        }
+        return jsonResponse(
+          { id: '00000000-0000-4000-8000-000000000001', type: body.type, status: 'queued', createdAt: new Date().toISOString() },
+          202,
+        );
+      }
+      if (url.includes('/recommendations')) return jsonResponse([fixtureRecommendation]);
+      if (url.endsWith('/properties')) return jsonResponse([property]);
+      if (url.includes('/events')) return jsonResponse([]);
+      throw new Error(`Unexpected fetch in test: ${method} ${url}`);
+    });
+
+    renderDashboard(9);
+    fireEvent.click(await screen.findByRole('button', { name: /check for new prices/i }));
+
+    const retryButton = await screen.findByRole('button', { name: /try again/i });
+    fireEvent.click(retryButton);
+
+    await waitFor(() => {
+      expect(jobBodies.map((body) => body.type)).toEqual([
+        'scrape.competitor_rates',
+        'ingest.events',
+        'scrape.competitor_rates',
+        'ingest.events',
+        'engine.generate_recommendations',
+      ]);
+    });
+    expect(screen.getByRole('status')).toHaveTextContent(
+      "Prices ✓ · What's on ✓ · Recalculating ✓",
+    );
   });
 });
 
