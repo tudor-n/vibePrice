@@ -102,7 +102,7 @@ the dataplane writes the `"__failed__"` sentinel to `place_candidates` in that c
 {"property_id": "...", "discovered": 4, "skipped_excluded": 1, "capped": 0}
 ```
 
-## Dashboard "Refresh data now"
+## Dashboard "Check for new prices"
 
 The dashboard button enqueues three jobs in order: `scrape.competitor_rates` (property
 scope) → `ingest.events` (city) → `engine.generate_recommendations` (property scope).

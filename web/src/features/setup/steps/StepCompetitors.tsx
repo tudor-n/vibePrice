@@ -15,17 +15,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useCompetitors, useResolveProperty } from '../../../api/hooks';
 import { AsyncStatus } from '../../../components/AsyncStatus';
 import { ErrorState } from '../../../components/States';
+import { formatRating } from '../../../components/formatRating';
 import type { Property } from '../../../api/types';
-
-/** "★ 4.5 (200 reviews)", or null when there is no rating on file yet. */
-function formatRating(rating?: number, ratingCount?: number): string | null {
-  if (typeof rating !== 'number') return null;
-  const count =
-    typeof ratingCount === 'number'
-      ? ` (${ratingCount} review${ratingCount === 1 ? '' : 's'})`
-      : '';
-  return `★ ${rating.toFixed(1)}${count}`;
-}
 
 export function StepCompetitors({ property }: { property: Property }) {
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -47,7 +38,7 @@ export function StepCompetitors({ property }: { property: Property }) {
   return (
     <div className="setup-step">
       <h1 ref={headingRef} tabIndex={-1}>
-        Finding your competitors…
+        Finding hotels near you…
       </h1>
       <p className="page-intro">
         We look for hotels and guesthouses near you on Google, so every price
@@ -57,7 +48,7 @@ export function StepCompetitors({ property }: { property: Property }) {
       {list.length === 0 ? (
         <AsyncStatus
           phase="working"
-          workingText="Finding hotels near you…"
+          workingText="Looking on Google now…"
           failedText="We couldn't finish finding nearby hotels."
           timeoutMs={40000}
           onRetry={reDiscover}

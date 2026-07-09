@@ -98,6 +98,26 @@ function renderPage() {
   );
 }
 
+describe('RecommendationsPage — plain-language copy', () => {
+  it('titles the page "Prices to review" with a jargon-free intro', async () => {
+    renderPage();
+    expect(await screen.findByRole('heading', { name: 'Prices to review' })).toBeInTheDocument();
+    expect(screen.getByText(/what nearby hotels charge/i)).toBeInTheDocument();
+    expect(screen.queryByText(/competitor band/i)).not.toBeInTheDocument();
+  });
+
+  it('shows an actionable empty state (not just a text pointer) with no hotel set up yet', async () => {
+    fetchMock.mockImplementation(async (input) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (url.endsWith('/properties')) return jsonResponse([]);
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    renderPage();
+    const link = await screen.findByRole('link', { name: /set up your hotel/i });
+    expect(link).toHaveAttribute('href', '/setup');
+  });
+});
+
 describe('RecommendationsPage — price calendar', () => {
   it('defaults the room type to the alphabetically first and switches on select', async () => {
     renderPage();
@@ -110,6 +130,14 @@ describe('RecommendationsPage — price calendar', () => {
 
     // The Double Deluxe row carries a factors-v2 band → range caption shows.
     expect(screen.getByText(/vs 380–455/)).toBeInTheDocument();
+  });
+
+  it('offers an inline explainer for the nearby-hotel price range shown under each night', async () => {
+    renderPage();
+    await screen.findByLabelText('Room type');
+    const trigger = screen.getByRole('button', { name: /what does "the price range" mean\?/i });
+    fireEvent.click(trigger);
+    expect(screen.getByRole('tooltip')).toHaveTextContent(/nearby hotels charge/i);
   });
 
   it('bounds month navigation to months that have data', async () => {
@@ -137,10 +165,12 @@ describe('RecommendationsPage — price calendar', () => {
     expect(anchor!.querySelector('article')).toHaveClass('rec-card-highlight');
   });
 
-  it('shows the illustrated empty state when there are no recommendations', async () => {
+  it('shows an actionable illustrated empty state when there are no recommendations', async () => {
     recommendationRows = [];
     renderPage();
     expect(await screen.findByText('All quiet on your street')).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Price calendar' })).toBeNull();
+    const link = screen.getByRole('link', { name: /check for new prices/i });
+    expect(link).toHaveAttribute('href', '/');
   });
 });

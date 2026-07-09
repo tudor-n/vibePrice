@@ -162,7 +162,7 @@ export function RecommendationCard({
 
       <footer className="rec-card-footer">
         <div className="rec-freshness">
-          <FreshnessBadge label="competitor prices" timestamp={freshness?.scraped_rates_at} />
+          <FreshnessBadge label="nearby hotel prices" timestamp={freshness?.scraped_rates_at} />
           <FreshnessBadge label="events" timestamp={freshness?.events_at} />
         </div>
         {isPending && (onAccept || onDismiss) && (

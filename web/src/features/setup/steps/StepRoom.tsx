@@ -24,7 +24,7 @@ export function StepRoom({ property }: { property: Property }) {
   const basePriceValue = Number(basePrice);
   const canSubmit =
     name.trim() !== '' &&
-    Number.isFinite(capacityValue) &&
+    Number.isInteger(capacityValue) &&
     capacityValue >= 1 &&
     Number.isFinite(basePriceValue) &&
     basePriceValue > 0 &&

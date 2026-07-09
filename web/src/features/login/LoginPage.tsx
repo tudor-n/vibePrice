@@ -50,8 +50,8 @@ export function LoginPage() {
               Prices your whole street can’t argue with.
             </p>
             <p className="login-tagline-sub">
-              Competitor rates, local events and demand — read for you every
-              morning, before your first coffee.
+              Nearby hotel rates, local events and demand — read for you
+              every morning, before your first coffee.
             </p>
           </div>
         </section>
@@ -60,7 +60,7 @@ export function LoginPage() {
           <h1 className="login-title">Welcome back</h1>
           <HandUnderline width={146} />
           <p className="page-intro">
-            Sign in to see your prices, competitors and recommendations.
+            Sign in to see your prices, nearby hotels and what&apos;s coming up.
           </p>
 
           <form className="stacked-form" onSubmit={handleSubmit}>

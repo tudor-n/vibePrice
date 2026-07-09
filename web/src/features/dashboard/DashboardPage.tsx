@@ -2,10 +2,11 @@ import { useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useEvents, useRecommendations, useTriggerJob } from '../../api/hooks';
 import { useSelectedProperty } from '../../app/PropertyContext';
-import { clearSetupDismissed, isSetupDismissed } from '../setup/setupState';
+import { clearSetupDismissed, isSetupDismissed } from '../../app/setupState';
 import { getActiveSession } from '../../auth/session';
 import { formatMoney } from '../../components/Money';
 import { AsyncStatus, type AsyncPhase } from '../../components/AsyncStatus';
+import { Explainer } from '../../components/Explainer';
 import { EmptyState, ErrorState, LoadingState } from '../../components/States';
 import { TownSilhouette } from '../../components/Townscape';
 import { Bunting, HandUnderline, IconRefresh } from '../../components/icons';
@@ -119,8 +120,8 @@ export function DashboardPage({ nowHour = new Date().getHours() }: DashboardPage
         <h3>Let&apos;s set up your hotel</h3>
         <p>
           A few quick steps — your hotel name, your first room rate, and
-          we&apos;ll find your nearby competitors and work out your first
-          price recommendation.
+          we&apos;ll find nearby hotels and work out your first price
+          suggestion.
         </p>
         <Link to="/setup" className="btn btn-primary" onClick={() => clearSetupDismissed()}>
           Start setup →
@@ -218,7 +219,7 @@ export function DashboardPage({ nowHour = new Date().getHours() }: DashboardPage
       <div className="card-grid">
         <section className="summary-card">
           <img className="corner-art" src={houseTerracotta} alt="" />
-          <h3>Pending recommendations</h3>
+          <h3>Prices to review</h3>
           {recommendations.isPending && <LoadingState what="recommendations" />}
           {recommendations.isError && <ErrorState error={recommendations.error} />}
           {recommendations.data && (
@@ -235,7 +236,13 @@ export function DashboardPage({ nowHour = new Date().getHours() }: DashboardPage
 
         <section className="summary-card">
           <img className="corner-art" src={houseOchre} alt="" />
-          <h3>Estimated total impact</h3>
+          <h3>
+            Extra income if you accept all{' '}
+            <Explainer label="extra income if you accept all">
+              Adds up the estimated extra revenue from every price suggestion
+              that&apos;s still waiting for your decision.
+            </Explainer>
+          </h3>
           {recommendations.isPending && <LoadingState what="estimates" />}
           {recommendations.isError && <ErrorState error={recommendations.error} />}
           {recommendations.data && (
@@ -251,7 +258,7 @@ export function DashboardPage({ nowHour = new Date().getHours() }: DashboardPage
               </p>
               <p className="summary-hint">
                 {totalImpact
-                  ? 'if you accept all pending recommendations'
+                  ? 'across your pending price suggestions'
                   : 'no pending estimates for the next 60 days'}
               </p>
             </>
@@ -273,7 +280,7 @@ export function DashboardPage({ nowHour = new Date().getHours() }: DashboardPage
                 </p>
               </>
             ) : (
-              <EmptyState message={`No upcoming events found for ${property.city}.`} />
+              <EmptyState message={`Nothing's coming up in ${property.city} right now.`} />
             ))}
         </section>
       </div>
@@ -296,8 +303,8 @@ export function DashboardPage({ nowHour = new Date().getHours() }: DashboardPage
         <div className="calendar-teaser-copy">
           <h3>Price calendar</h3>
           <p>
-            Your month at a glance — every night against the local competitor
-            band, with the days worth acting on called out.{' '}
+            Your month at a glance — every night compared with what nearby
+            hotels charge, with the days worth acting on called out.{' '}
             <Link to="/recommendations">Open the price calendar</Link>.
           </p>
         </div>

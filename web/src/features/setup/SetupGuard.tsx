@@ -9,7 +9,7 @@
  */
 
 import { Navigate } from 'react-router-dom';
-import { isSetupDismissed } from './setupState';
+import { isSetupDismissed } from '../../app/setupState';
 import { SetupWizard } from './SetupWizard';
 
 export function SetupGuard() {

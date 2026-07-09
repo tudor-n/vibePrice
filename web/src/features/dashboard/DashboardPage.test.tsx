@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { DashboardPage, greetingForHour, refreshStepsText } from './DashboardPage';
 import { SetupGuard } from '../setup/SetupGuard';
-import { dismissSetup, isSetupDismissed } from '../setup/setupState';
+import { dismissSetup, isSetupDismissed } from '../../app/setupState';
 import { PropertyProvider } from '../../app/PropertyContext';
 import { renderWithProviders } from '../../test/renderWithProviders';
 import type { ExtraRoute } from '../../test/renderWithProviders';
@@ -168,6 +168,22 @@ describe('DashboardPage', () => {
     expect(
       await screen.findByRole('heading', { name: 'Good evening, Ana' }),
     ).toBeInTheDocument();
+  });
+
+  it('uses plain-language card titles, with an inline explainer on "Extra income if you accept all"', async () => {
+    renderDashboard(9);
+    await screen.findByRole('heading', { name: 'Good morning, Ana' });
+
+    expect(screen.getByRole('heading', { name: 'Prices to review' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: /extra income if you accept all/i }),
+    ).toBeInTheDocument();
+
+    const trigger = screen.getByRole('button', {
+      name: /what does "extra income if you accept all" mean\?/i,
+    });
+    fireEvent.click(trigger);
+    expect(screen.getByRole('tooltip')).toHaveTextContent(/waiting for your decision/i);
   });
 
   it('refresh enqueues the three pipeline jobs in order with their payloads', async () => {

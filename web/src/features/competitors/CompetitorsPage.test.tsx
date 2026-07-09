@@ -120,26 +120,36 @@ describe('haversineDistanceKm', () => {
   });
 });
 
+describe('CompetitorsPage — plain-language copy', () => {
+  it('titles the page "Nearby hotels" with a short, jargon-free intro', async () => {
+    renderPage();
+    expect(await screen.findByRole('heading', { name: 'Nearby hotels' })).toBeInTheDocument();
+    expect(screen.getByText('Hotels near you we keep an eye on.')).toBeInTheDocument();
+  });
+});
+
 describe('CompetitorsPage — states', () => {
   it('shows a loading state while properties load', () => {
     renderPage();
     expect(screen.getByText(/Loading your properties/)).toBeInTheDocument();
   });
 
-  it('shows an empty state when there are no properties', async () => {
+  it('shows an actionable empty state when there are no properties', async () => {
     fetchMock.mockImplementation(async (input) => {
       const url = typeof input === 'string' ? input : input.toString();
       if (url.endsWith('/properties')) return jsonResponse([]);
       throw new Error(`Unexpected fetch: ${url}`);
     });
     renderPage();
-    expect(await screen.findByText(/Add a property in Settings/)).toBeInTheDocument();
+    expect(await screen.findByText("You haven't set up a hotel yet.")).toBeInTheDocument();
+    const link = screen.getByRole('link', { name: /set up your hotel/i });
+    expect(link).toHaveAttribute('href', '/setup');
   });
 
-  it('shows an empty state when no competitors are discovered yet', async () => {
+  it('shows a plain "still finding hotels" message when none are discovered yet', async () => {
     competitorRows = [];
     renderPage();
-    expect(await screen.findByText(/No competitors discovered yet/)).toBeInTheDocument();
+    expect(await screen.findByText(/we're still finding hotels near you/i)).toBeInTheDocument();
   });
 
   it('does NOT poll competitors by default — a permanently-empty list is not refetched on an interval', async () => {
@@ -148,7 +158,7 @@ describe('CompetitorsPage — states', () => {
     // uses the default, so an empty list must not trigger an endless 3s refetch.
     competitorRows = [];
     renderPage();
-    await screen.findByText(/No competitors discovered yet/);
+    await screen.findByText(/we're still finding hotels near you/i);
     const countAfterMount = competitorGetCount();
 
     // Wait past one 3s poll interval; with polling off the count stays put.
@@ -192,12 +202,12 @@ describe('CompetitorsPage — untrack with confirm', () => {
 
     fireEvent.click(within(row).getByRole('button', { name: 'Untrack' }));
     expect(
-      within(row).getByText('This competitor stays removed from your tracking.'),
+      within(row).getByText('This hotel will no longer show up here.'),
     ).toBeInTheDocument();
 
     fireEvent.click(within(row).getByRole('button', { name: 'Cancel' }));
     expect(
-      screen.queryByText('This competitor stays removed from your tracking.'),
+      screen.queryByText('This hotel will no longer show up here.'),
     ).not.toBeInTheDocument();
     expect(deletedIds).toEqual([]);
   });

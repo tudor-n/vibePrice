@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   useRecommendations,
   useUpdateRecommendationStatus,
@@ -85,7 +86,10 @@ export function RecommendationsPage() {
   if (properties.isError) return <ErrorState error={properties.error} />;
   if (!properties.data || properties.data.length === 0) {
     return (
-      <EmptyState message="No properties yet. Add your first property in Settings to start receiving price recommendations." />
+      <EmptyState
+        message="You haven't set up a hotel yet."
+        action={{ label: 'Set up your hotel', to: '/setup' }}
+      />
     );
   }
 
@@ -102,12 +106,12 @@ export function RecommendationsPage() {
 
   return (
     <div className="page">
-      <h2>Recommendations &amp; price calendar</h2>
-      <HandUnderline width={210} />
+      <h2>Prices to review</h2>
+      <HandUnderline width={188} />
       <p className="page-intro">
-        Your rate for each night against the local competitor band — with the
-        days worth acting on called out. Accept the suggestions you agree
-        with; nothing changes without your approval.
+        Your price for each night ahead, compared with what nearby hotels
+        charge — the days worth acting on are called out below. Accept the
+        suggestions you agree with; nothing changes until you do.
       </p>
 
       {updateStatus.isError && <ErrorState error={updateStatus.error} />}
@@ -120,9 +124,13 @@ export function RecommendationsPage() {
           <img src={houseSage} alt="" />
           <h3>All quiet on your street</h3>
           <p>
-            No price suggestions for the next 90 days. Trigger a refresh from
-            the Dashboard and we'll nudge you the moment something changes.
+            No price suggestions for the next 90 days yet. Check for new
+            prices any time, and we&apos;ll let you know the moment something
+            changes.
           </p>
+          <Link to="/" className="btn btn-primary">
+            Check for new prices →
+          </Link>
         </div>
       )}
 

@@ -27,8 +27,8 @@ export function StepName() {
         What&apos;s your hotel called?
       </h1>
       <p className="page-intro">
-        We&apos;ll use this to find your listing on Google and start watching
-        nearby competitors for you.
+        We&apos;ll use this to find your listing on Google and start keeping
+        an eye on nearby hotels for you.
       </p>
       <form
         className="stacked-form"

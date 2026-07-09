@@ -7,7 +7,7 @@
 
 import { useNavigate } from 'react-router-dom';
 import { useSetupProgress } from './useSetupProgress';
-import { dismissSetup } from './setupState';
+import { dismissSetup } from '../../app/setupState';
 import { StepName } from './steps/StepName';
 import { StepConfirmPlace } from './steps/StepConfirmPlace';
 import { StepRoom } from './steps/StepRoom';

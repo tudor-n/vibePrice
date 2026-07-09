@@ -3,7 +3,7 @@ import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { SetupWizard } from './SetupWizard';
 import { SetupGuard } from './SetupGuard';
 import { StepCompetitors } from './steps/StepCompetitors';
-import { dismissSetup, isSetupDismissed } from './setupState';
+import { dismissSetup, isSetupDismissed } from '../../app/setupState';
 import { renderWithProviders } from '../../test/renderWithProviders';
 import type { Competitor, Property, Recommendation } from '../../api/types';
 
@@ -271,7 +271,22 @@ describe('SetupWizard — step 3: your room + rate', () => {
       });
     });
 
-    expect(await screen.findByRole('heading', { name: /finding your competitors/i })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /finding hotels near you/i })).toBeInTheDocument();
+  });
+
+  it('disables Continue for a fractional Sleeps value (the server requires a whole number)', async () => {
+    propertyRows = [resolvedNoRooms];
+    renderWithProviders(<SetupWizard />);
+    await screen.findByLabelText('Room type name');
+
+    fireEvent.change(screen.getByLabelText('Room type name'), { target: { value: 'Double room' } });
+    fireEvent.change(screen.getByLabelText('Price per night'), { target: { value: '350' } });
+    fireEvent.change(screen.getByLabelText('Sleeps'), { target: { value: '2.5' } });
+
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText('Sleeps'), { target: { value: '2' } });
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeEnabled();
   });
 });
 
@@ -280,7 +295,10 @@ describe('SetupWizard — step 4: finding competitors', () => {
     propertyRows = [resolvedWithRooms];
     competitorRows = [];
     renderWithProviders(<SetupWizard />);
-    expect(await screen.findByText('Finding hotels near you…')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Finding hotels near you…' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Looking on Google now…')).toBeInTheDocument();
   });
 
   it('lists the discovered names + ratings once competitors already exist', async () => {
@@ -298,7 +316,7 @@ describe('SetupWizard — step 4: finding competitors', () => {
     expect(screen.getByText('Pensiunea Rustic')).toBeInTheDocument();
     expect(screen.getByText('No rating yet')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Next' })).toBeInTheDocument();
-    expect(screen.queryByText('Finding hotels near you…')).not.toBeInTheDocument();
+    expect(screen.queryByText('Looking on Google now…')).not.toBeInTheDocument();
   });
 
   it('advances the wizard to step 5 once competitors are discovered', async () => {

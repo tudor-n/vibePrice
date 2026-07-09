@@ -12,6 +12,15 @@ describe('RecommendationCard', () => {
     expect(screen.getByText(/recommended/)).toBeInTheDocument();
   });
 
+  it('labels the rates freshness badge in plain language, not "competitor"', () => {
+    render(<RecommendationCard recommendation={fixtureRecommendation} />);
+    // The freshness badge is client copy — plain language. The factor
+    // "reason" sentences are server-generated content rendered verbatim
+    // (shared/contracts/recommendation-factors.md) and are untouched here.
+    expect(screen.getByText(/nearby hotel prices updated/)).toBeInTheDocument();
+    expect(screen.queryByText('competitor prices', { exact: false })).not.toBeInTheDocument();
+  });
+
   it('renders every factor reason as plain language, including unknown rules', () => {
     render(<RecommendationCard recommendation={fixtureRecommendation} />);
     for (const factor of fixtureFactors.factors) {

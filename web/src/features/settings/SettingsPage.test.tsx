@@ -111,6 +111,13 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+describe('SettingsPage — plain-language copy', () => {
+  it('titles the page "Your hotel"', async () => {
+    renderWithProviders(<SettingsPage />);
+    expect(await screen.findByRole('heading', { name: 'Your hotel' })).toBeInTheDocument();
+  });
+});
+
 describe('SettingsPage — loading/error/empty', () => {
   it('shows a loading state while properties load', () => {
     renderWithProviders(<SettingsPage />);
@@ -200,6 +207,31 @@ describe('SettingsPage — resolved property card', () => {
     await waitFor(() => {
       expect(lastResolveBody).toEqual({ query: 'Pensiunea Rustic Brasov' });
     });
+  });
+
+  it('a blank "search again" re-searches using the property\'s own name (converts \'\' to undefined)', async () => {
+    propertyRows = [resolvedProperty];
+    renderWithProviders(<SettingsPage />);
+    await screen.findByText('Strada Nicolae Bălcescu 12, Sibiu');
+
+    fireEvent.click(screen.getByText('Not the right place?'));
+    fireEvent.click(screen.getByRole('button', { name: 'Search again' }));
+
+    await waitFor(() => {
+      expect(lastResolveBody).toEqual({});
+    });
+  });
+});
+
+describe('SettingsPage — room types', () => {
+  it('offers an actionable way to add a room type when a resolved property has none', async () => {
+    propertyRows = [resolvedProperty];
+    renderWithProviders(<SettingsPage />);
+    await screen.findByText('Strada Nicolae Bălcescu 12, Sibiu');
+
+    expect(screen.getByText("You haven't added a room type yet.")).toBeInTheDocument();
+    const link = screen.getByRole('link', { name: /add a room type/i });
+    expect(link).toHaveAttribute('href', '/setup');
   });
 });
 

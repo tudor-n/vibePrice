@@ -1,6 +1,6 @@
 /**
  * Setup step 5: run the real pricing pipeline once (mirrors the dashboard's
- * "Refresh data now" — same three jobs, same order, see
+ * "Check for new prices" — same three jobs, same order, see
  * shared/contracts/jobs.md) and wait for the first recommendation to land.
  * If one already exists (resumed session), it renders immediately — no need
  * to re-click the button.
@@ -9,7 +9,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useRecommendations, useTriggerJob } from '../../../api/hooks';
-import { dismissSetup } from '../setupState';
+import { dismissSetup } from '../../../app/setupState';
 import { AsyncStatus } from '../../../components/AsyncStatus';
 import { ErrorState } from '../../../components/States';
 import { Money } from '../../../components/Money';

@@ -21,11 +21,11 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { to: '/', label: 'Dashboard', end: true, icon: IconDashboard },
-  { to: '/recommendations', label: 'Recommendations', end: false, icon: IconRecommendations },
-  { to: '/competitors', label: 'Competitors', end: false, icon: IconCompetitors },
-  { to: '/events', label: 'Events', end: false, icon: IconEvents },
-  { to: '/settings', label: 'Settings', end: false, icon: IconSettings },
+  { to: '/', label: 'Home', end: true, icon: IconDashboard },
+  { to: '/recommendations', label: 'Prices to review', end: false, icon: IconRecommendations },
+  { to: '/competitors', label: 'Nearby hotels', end: false, icon: IconCompetitors },
+  { to: '/events', label: "What's on", end: false, icon: IconEvents },
+  { to: '/settings', label: 'Your hotel', end: false, icon: IconSettings },
 ];
 
 function PropertySelector() {

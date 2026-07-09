@@ -13,7 +13,12 @@ export const router = createBrowserRouter([
   // Login lives outside the Layout — no sidebar, no guard.
   { path: '/login', element: <LoginPage /> },
   // The onboarding wizard is full-screen — also outside the Layout.
-  // SetupGuard redirects owners who already have a property to the dashboard.
+  // SetupGuard redirects to the dashboard only once the owner has
+  // deliberately dismissed setup (see app/setupState.ts's "dismissed"
+  // milestone) — never merely because a property already exists, which
+  // would eject them mid-wizard (step 1 already creates a property).
+  // Everyone else resumes the wizard at whatever step their server state
+  // implies.
   {
     path: '/setup',
     element: (

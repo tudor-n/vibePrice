@@ -8,22 +8,13 @@
 
 import { useId, useState } from 'react';
 import type { PlaceCandidate } from '../api/types';
+import { formatRating } from './formatRating';
 
 export interface PlacePickerProps {
   candidates: PlaceCandidate[];
   onPick: (placeId: string) => void;
   onResearch: (query: string) => void;
   pending?: boolean;
-}
-
-/** "★ 4.5 (200 reviews)", or null when there is no rating on file yet. */
-function formatRating(rating?: number, ratingCount?: number): string | null {
-  if (typeof rating !== 'number') return null;
-  const count =
-    typeof ratingCount === 'number'
-      ? ` (${ratingCount} review${ratingCount === 1 ? '' : 's'})`
-      : '';
-  return `★ ${rating.toFixed(1)}${count}`;
 }
 
 export function PlacePicker({ candidates, onPick, onResearch, pending = false }: PlacePickerProps) {

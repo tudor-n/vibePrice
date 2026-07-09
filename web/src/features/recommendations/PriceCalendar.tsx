@@ -10,6 +10,7 @@
 
 import { useState } from 'react';
 import { formatMoney, formatMoneyBare } from '../../components/Money';
+import { Explainer } from '../../components/Explainer';
 import { IconChevronLeft, IconChevronRight, IconSpire } from '../../components/icons';
 import type { CalendarDay, CalendarRow } from './calendarModel';
 import {
@@ -114,6 +115,10 @@ export function PriceCalendar({ rows, propertyName, onDayClick }: PriceCalendarP
           <span className="cal-caption">
             {propertyName} · {room}
           </span>
+          <Explainer label="the price range">
+            This is what nearby hotels charge for the same night — the
+            lowest and highest rate we found among them.
+          </Explainer>
           <span className="cal-nav">
             <button
               type="button"
