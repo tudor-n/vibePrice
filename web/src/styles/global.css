@@ -1521,6 +1521,63 @@ details.place-correction-toggle summary {
   gap: var(--space-4);
 }
 
+/* --- Setup wizard (full-screen onboarding, outside the app Layout) ------- */
+
+.setup {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-6) var(--space-5);
+  background: var(--bg-paper);
+}
+
+.setup-shell {
+  width: 100%;
+  max-width: 34rem;
+  background: var(--bg-card);
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-hero);
+  padding: 40px 44px 36px;
+}
+
+.setup-progress {
+  display: flex;
+  justify-content: center;
+  margin-bottom: var(--space-6);
+}
+
+.setup-dots {
+  display: inline-flex;
+  gap: 10px;
+}
+
+.setup-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--line);
+}
+
+.setup-dot-filled {
+  background: var(--terracotta);
+}
+
+.setup-step h1 {
+  font-size: var(--text-2xl);
+}
+
+.setup-step .stacked-form {
+  max-width: none;
+  margin-top: var(--space-5);
+}
+
+.setup-skip {
+  display: block;
+  margin: var(--space-6) auto 0;
+}
+
 /* --- Townscape animation (login hero ONLY — data screens have no animation) --- */
 
 @keyframes ts-cloud-drift-a {
