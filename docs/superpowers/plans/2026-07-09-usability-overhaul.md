@@ -223,6 +223,7 @@ export interface AsyncStatusProps {
   workingText: string;          // "Finding your place on Google…"
   doneText?: string;            // "Found it ✓"
   slowText?: string;            // default: "This is taking longer than usual…"
+  failedText?: string;          // default: "We couldn't reach Google just now." — override per context
   timeoutMs?: number;           // default 20000; after this while still 'working' → show SLOW affordances
   onRetry?: () => void;         // shown in SLOW + FAILED
   onBackground?: () => void;    // shown in SLOW ("Keep working in the background")
@@ -460,9 +461,9 @@ export function deriveStep(properties: Property[], competitorCount: number): { s
 ```
 Update `useSetupProgress.test.ts` and callers for the new signature.
 
-- [ ] **Step 4: Implement `StepCompetitors.tsx`** — `useCompetitors(propertyId, { refetchInterval })`; while empty render `<AsyncStatus phase="working" workingText="Finding hotels near you…" timeoutMs={40000} onRetry={reDiscover} onBackground={goDashboard} />` (re-discover = `useResolveProperty` re-fires the chain, or a dedicated re-trigger — reuse `resolve-place` which chain-enqueues discovery). Once non-empty, show the discovered names + ratings and a "Next" button.
+- [ ] **Step 4: Implement `StepCompetitors.tsx`** — `useCompetitors(propertyId, { refetchInterval })`; while empty render `<AsyncStatus phase="working" workingText="Finding hotels near you…" failedText="We couldn't finish finding nearby hotels." timeoutMs={40000} onRetry={reDiscover} onBackground={goDashboard} />` (re-discover = `useResolveProperty` re-fires the chain, or a dedicated re-trigger — reuse `resolve-place` which chain-enqueues discovery). Once non-empty, show the discovered names + ratings and a "Next" button.
 
-- [ ] **Step 5: Implement `StepFirstPrices.tsx`** — a primary "Show me my first price" button runs the pipeline exactly like the dashboard refresh (`scrape.competitor_rates` → `ingest.events` → `engine.generate_recommendations`, sequential `mutateAsync`), then polls `useRecommendations(propertyId, today, horizon, { refetchInterval })`; when a pending recommendation appears, render the first one (recommended price + the plain "why" from `factors`), with `[ Looks good — take me in → ]` → `navigate('/')`. Use `AsyncStatus` for the pipeline wait with the SLOW fallback.
+- [ ] **Step 5: Implement `StepFirstPrices.tsx`** — a primary "Show me my first price" button runs the pipeline exactly like the dashboard refresh (`scrape.competitor_rates` → `ingest.events` → `engine.generate_recommendations`, sequential `mutateAsync`), then polls `useRecommendations(propertyId, today, horizon, { refetchInterval })`; when a pending recommendation appears, render the first one (recommended price + the plain "why" from `factors`), with `[ Looks good — take me in → ]` → `navigate('/')`. Use `AsyncStatus` for the pipeline wait with the SLOW fallback (pass `failedText="We couldn't work out your first price just now."`).
 
 - [ ] **Step 6: Dashboard nudge.** In `DashboardPage.tsx`, replace the current no-property `EmptyState` with an actionable block: `"Let's set up your hotel"` + `<Link to="/setup" className="btn btn-primary">Start setup →</Link>`. (Full copy rewrite of the rest of the dashboard is Task 6.)
 
@@ -486,7 +487,7 @@ Update `useSetupProgress.test.ts` and callers for the new signature.
 
 - [ ] **Step 2: Run to verify it fails** — `cd web && npm test -- --run src/features/dashboard` → FAIL.
 
-- [ ] **Step 3: Implement** — replace the current "Refresh queued — …" one-liner with a small stepper driven by which of the three sequential `mutateAsync` calls have resolved (local state: `'idle'|'rates'|'events'|'engine'|'done'|'failed'`). Rename the button to **"Check for new prices"**. Show `Prices ✓ · What's on ✓ · Recalculating…`. On rejection → FAILED + Try again (re-runs `handleRefresh`). Keep it react-query driven; no `useEffect` fetching (the sequential `mutateAsync` in the existing `handleRefresh` stays).
+- [ ] **Step 3: Implement** — replace the current "Refresh queued — …" one-liner with a small stepper driven by which of the three sequential `mutateAsync` calls have resolved (local state: `'idle'|'rates'|'events'|'engine'|'done'|'failed'`). Rename the button to **"Check for new prices"**. Show `Prices ✓ · What's on ✓ · Recalculating…`. On rejection → FAILED + Try again (re-runs `handleRefresh`); if using `AsyncStatus`, pass `failedText="We couldn't refresh your prices just now."`. Keep it react-query driven; no `useEffect` fetching (the sequential `mutateAsync` in the existing `handleRefresh` stays).
 
 - [ ] **Step 4: Run tests** `cd web && npm test -- --run src/features/dashboard && npm run typecheck` → green.
 
