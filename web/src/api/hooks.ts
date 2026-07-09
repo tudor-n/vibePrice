@@ -16,6 +16,8 @@ import type {
   PropertyCreate,
   Recommendation,
   ResolvePlace,
+  RoomType,
+  RoomTypeCreate,
 } from './types';
 
 export function useLogin() {
@@ -59,6 +61,17 @@ export function useCreateProperty() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['properties'] });
     },
+  });
+}
+
+export function useCreateRoomType() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ propertyId, body }: { propertyId: string; body: RoomTypeCreate }) =>
+      apiFetch<RoomType>(`/properties/${propertyId}/room-types`, {
+        method: 'POST', body: JSON.stringify(body),
+      }),
+    onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ['properties'] }); },
   });
 }
 

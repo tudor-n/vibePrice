@@ -48,6 +48,30 @@ public sealed class PropertyService(AppDbContext db, ITenantContext tenantContex
         return ToDto(property, []);
     }
 
+    public async Task<RoomTypeDto?> AddRoomTypeAsync(Guid propertyId, RoomTypeCreateDto dto, CancellationToken ct)
+    {
+        var tenantId = tenantContext.TenantId
+            ?? throw new InvalidOperationException("Cannot create a room type without a resolved tenant.");
+        var propertyExists = await db.Properties.AsNoTracking().AnyAsync(p => p.Id == propertyId, ct);
+        if (!propertyExists) return null; // tenant filter => foreign id is simply not found
+
+        var roomType = new RoomType
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            PropertyId = propertyId,
+            Name = dto.Name.Trim(),
+            Capacity = dto.Capacity,
+            BasePrice = dto.BasePrice,
+            CurrentPrice = dto.CurrentPrice ?? dto.BasePrice,
+            Currency = (dto.Currency ?? "RON").ToUpperInvariant(),
+        };
+        db.RoomTypes.Add(roomType);
+        await db.SaveChangesAsync(ct);
+        return new RoomTypeDto(roomType.Id, roomType.Name, roomType.Capacity,
+            roomType.BasePrice, roomType.CurrentPrice, roomType.Currency);
+    }
+
     public Task<bool> ExistsAsync(Guid propertyId, CancellationToken ct) =>
         db.Properties.AsNoTracking().AnyAsync(p => p.Id == propertyId, ct);
 

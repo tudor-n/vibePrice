@@ -78,6 +78,15 @@ export interface PropertyCreate {
   address?: string;
 }
 
+/** POST /properties/{id}/room-types — owner adds a room type. */
+export interface RoomTypeCreate {
+  name: string;
+  capacity: number;
+  basePrice: number;
+  currentPrice?: number;
+  currency?: string;
+}
+
 /** PATCH /properties/{id}/place — owner picks a stored candidate. */
 export interface PlacePick {
   placeId: string;

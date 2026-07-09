@@ -29,6 +29,9 @@ public sealed record PropertyDto(
 
 public sealed record PropertyCreateDto(string Name, string City, string? Address);
 
+public sealed record RoomTypeCreateDto(
+    string Name, int Capacity, decimal BasePrice, decimal? CurrentPrice, string? Currency);
+
 public sealed record PlacePickDto(string PlaceId);
 
 public sealed record ResolvePlaceDto(string? Query);
