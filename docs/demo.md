@@ -113,6 +113,58 @@ and `... nearby --lat <r> --lng <r>` (see `dataplane/CLAUDE.md` for the scraper
 `capture` CLI this mirrors); the sanitized output replaces the fixtures above so
 the demo replays real Google data while tests still never call it live.
 
+## Usability overhaul — guided onboarding
+
+Verified sequence for the guided onboarding wizard, async transparency
+(`AsyncStatus`), and the plain-language rewrite
+(`docs/superpowers/specs/2026-07-09-usability-overhaul-design.md`). Uses the
+same running stack as sections 1–4 above (db + api + dataplane worker + web).
+
+1. **Log in** as the *empty* seed account — `new@pricepilot.local` /
+   `Demo1234!` (`shared/contracts/demo-seed.md`'s second tenant, seeded with
+   no property/rooms/competitors on purpose, so the brand-new-owner flow is
+   always reachable in the demo).
+2. Instead of an empty dashboard, the app **auto-routes to the full-screen
+   `/setup` wizard** (no sidebar/topbar) — a brand-new owner with zero
+   properties always lands here first.
+3. **① Hotel name + town** — "What's your hotel called?": enter a name (e.g.
+   `Casa Luca`) and a town (`Sibiu`), Continue. Creates the property and
+   fires `resolve_place`.
+4. **② "Is this your place?"** — "Which one is you?" — while resolution runs
+   the step shows `AsyncStatus`'s working copy ("Finding your place on
+   Google…"); once the top-5 Google candidates land, pick the match (name ·
+   address · ★rating).
+5. **③ Your room + nightly rate** — "Add your first room type": room name,
+   sleeps, price/night, currency (defaults `RON`). Continue calls the new
+   `POST /properties/{id}/room-types` endpoint.
+6. **④ "Finding hotels near you…"** — the chained `discover_competitors` job
+   runs; the step polls the competitors list and lists names + ratings as
+   they land (competitors auto-discovered, no manual entry), then `Next`.
+7. **⑤ Your first price** — "Let's see your first price" → `Show me my first
+   price` runs the same three jobs as the dashboard's refresh
+   (scrape → events → engine), then shows the first recommendation card
+   (current → recommended price + the plain-language "why"). `Looks good —
+   take me in →` lands on **Home**.
+
+With `PLACES_PROVIDER=fixture` (the default — see `.env.example`), every
+hotel name resolves to the same saved Sibiu fixture used in the Google
+Places section above, so the whole walkthrough is deterministic and free
+regardless of what you type. The **whole stack, including the dataplane
+worker, must be running** for steps ②/④/⑤ to resolve — if it isn't, those
+`AsyncStatus` steps stay on their working copy for the configured budget
+(~20s resolve, ~40s discovery) and then flip to **"This is taking longer
+than usual. The setup service may not be running."** with `Try again` /
+`Keep working in the background`, instead of hanging forever.
+
+**Plain-language nav.** The sidebar now reads **Home · Prices to review ·
+Nearby hotels · What's on · Your hotel** (was Dashboard · Recommendations ·
+Competitors · Events · Settings — labels only, routes unchanged).
+
+**Dashboard refresh, with real progress.** Home's **"Check for new prices"**
+button (was "Refresh data now") shows the same three jobs as a live 3-step
+status — `Prices ✓ · What's on ✓ · Recalculating…` — instead of a bare
+"queued" message, with the same slow/failed fallback as the wizard.
+
 ## Full-container alternative
 
 `docker compose up --build` runs db + api (migrates + seeds) + dataplane scheduler + web

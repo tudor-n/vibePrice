@@ -173,6 +173,75 @@ non-goals): the **reviews pricing rule** (own vs. competitor reputation →
 verification** against a billing-enabled key (human-in-the-loop, like the
 Booking scraper live-verify), and a separate **UX/accessibility overhaul**.
 
+## Usability overhaul — landed 2026-07-09
+
+Spec: `superpowers/specs/2026-07-09-usability-overhaul-design.md` · plan:
+`superpowers/plans/2026-07-09-usability-overhaul.md`. Addresses the
+"separate UX/accessibility overhaul" the Google Places foundation above
+flagged as deferred — owner's brief: make the app "foolproofed and
+incredibly obvious and intuitive" for non-technical hotel owners.
+
+- [x] **Guided onboarding wizard**: full-screen `/setup` route (outside the
+  main Layout), auto-entered by a logged-in owner with zero properties.
+  Five one-thing-per-screen steps — ① hotel name + town (creates the
+  property, fires `resolve_place`) → ② "Which one is you?" (`PlacePicker`
+  over the top-5 Google candidates, or search-again) → ③ your room + nightly
+  rate (new room-type endpoint) → ④ "Finding hotels near you…" (auto
+  `discover_competitors`, no manual entry) → ⑤ your first price (runs
+  scrape→events→engine, shows the first recommendation card). Resumes at the
+  correct step on reload by reading real server state (`useSetupProgress`/
+  `deriveStep` — no client-duplicated truth); a quiet "Skip for now" never
+  traps the owner; the dashboard keeps a "Finish setting up"/"Start setup"
+  nudge until a property **and** a room type both exist.
+- [x] **Async transparency**: shared `AsyncStatus` component (working → done
+  → **slow** timeout escalation → failed; `aria-live="polite"`, plain copy,
+  never a dead-end spinner — "Try again" / "Keep working in the
+  background"). Applied at wizard steps ②/④/⑤, the dashboard's **"Check for
+  new prices"** button (was "Refresh data now" — now real 3-step progress
+  `Prices ✓ · What's on ✓ · Recalculating…` instead of a bare "queued"), and
+  Settings' property card (folded its bespoke resolving/failed states onto
+  the same primitive, gaining the SLOW escalation it lacked before).
+- [x] **Plain-language rewrite**: one warm, second-person voice across nav
+  (**Home / Prices to review / Nearby hotels / What's on / Your hotel** —
+  labels only, routes unchanged), Home, Prices to review, Nearby hotels,
+  What's on, Your hotel, login, the wizard, and shared components; jargon
+  metrics ("competitor band", "estimated total impact") got plain rewrites
+  plus an inline `Explainer` ("?" popover, keyboard-reachable, dismissible);
+  empty states are now buttons that do the obvious next thing instead of a
+  sentence pointing at a menu.
+- [x] **Backend — room-type create**: `POST /properties/{id}/room-types`
+  (name/capacity/basePrice validated at the endpoint layer, `currentPrice`
+  defaults to `basePrice`, `currency` defaults `RON`; tenant-scoped, foreign
+  id → 404 not 403); `openapi.yaml` + `web/src/api/types.ts` updated in the
+  same commit. Demo seed gained a second, intentionally-empty tenant/user
+  (`new@pricepilot.local` / `Demo1234!`, `shared/contracts/demo-seed.md`) so
+  the brand-new-owner flow is always reachable without hand-seeding.
+- [x] **Accessibility**: focus moves to each wizard step's heading on
+  advance; ≥44px primary actions; visible focus; real labels on every
+  control; `prefers-reduced-motion` honored on the animated working states.
+- [x] **Demo**: `docs/demo.md` "Usability overhaul — guided onboarding"
+  walkthrough (log in as the empty seed account → auto-route to `/setup` →
+  all 5 steps → Home), using the same `PLACES_PROVIDER=fixture` determinism
+  as the Google Places section.
+- [x] Verified: backend 75/75 unit tests (1 integration test skipped — no
+  Postgres in this environment; 0 build warnings); web 176/176 tests +
+  typecheck + build; dataplane sanity re-run 175 passed / 14 skipped
+  (unaffected — no dataplane code changed this slice). Per-task code review
+  (tasks 1–6) landed clean, see `.superpowers/sdd/progress.md`; the
+  full-stack manual smoke and the final whole-branch review/PR are
+  human/controller steps, not yet run — checklist in the task-7 report.
+
+**Still deferred** (explicit non-goals of this slice, per the design):
+**live typeahead place search** (picker B — a dropdown that updates as you
+type; needs a synchronous search path, not yet architected), **self-service
+account signup** (still login-only with seeded users), **room-type
+editing** + a **Settings "Add room" form** (so multi-property owners can add
+a room to hotel #2+ without going through the single-property wizard) + the
+**accept-a-recommendation-sets-`current_price` loop** (wave-4 proper — see
+`superpowers/specs/2026-07-08-wave-4-owner-self-service-design.md`, on
+hold), the **reviews / proximity pricing rules**, and **i18n** (copy stays
+English; translation itself is a later concern).
+
 ## Backlog (ordered roughly by value)
 
 - [x] End-to-end demo doc: `docs/demo.md` (compose/local, seed, engine run, login)
