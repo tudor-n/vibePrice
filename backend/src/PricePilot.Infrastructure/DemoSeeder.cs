@@ -6,10 +6,11 @@ using PricePilot.Domain;
 namespace PricePilot.Infrastructure;
 
 /// <summary>
-/// Seeds the backend-owned demo rows fixed in shared/contracts/demo-seed.md: one tenant,
-/// one user, one property, two room types, three competitors — all with contract UUIDs.
-/// Dev/demo only: Program.cs runs it solely when Demo__SeedOnStartup=true AND the
-/// environment is Development, after migrations.
+/// Seeds the backend-owned demo rows fixed in shared/contracts/demo-seed.md: the fully
+/// set-up demo tenant (one user, one property, two room types, three competitors) plus a
+/// second, intentionally empty tenant + user for exercising the brand-new-owner onboarding
+/// flow — all with contract UUIDs. Dev/demo only: Program.cs runs it solely when
+/// Demo__SeedOnStartup=true AND the environment is Development, after migrations.
 ///
 /// Idempotent by construction: each row is inserted only when its fixed primary key is
 /// absent and never updated afterwards, so re-running (including against a partially
@@ -26,8 +27,16 @@ public sealed class DemoSeeder(AppDbContext db, IPasswordHasher<User> passwordHa
     public const string DemoEmail = "demo@pricepilot.local";
     public const string DemoPassword = "Demo1234!";
 
+    // A second, intentionally EMPTY tenant (no property/rooms/competitors) whose only
+    // purpose is to log in and experience the brand-new-owner / onboarding flow. Same
+    // password as the demo account for convenience.
+    public const string NewOwnerEmail = "new@pricepilot.local";
+    public const string NewOwnerPassword = DemoPassword;
+
     public static readonly Guid TenantId = Guid.Parse("11111111-1111-4111-8111-111111111111");
     public static readonly Guid UserId = Guid.Parse("22222222-2222-4222-8222-222222222222");
+    public static readonly Guid NewOwnerTenantId = Guid.Parse("66666666-6666-4666-8666-666666666666");
+    public static readonly Guid NewOwnerUserId = Guid.Parse("77777777-7777-4777-8777-777777777777");
     public static readonly Guid PropertyId = Guid.Parse("33333333-3333-4333-8333-333333333333");
     public static readonly Guid RoomTypeDoubleId = Guid.Parse("44444444-4444-4444-8444-444444444444");
     public static readonly Guid RoomTypeApartmentId = Guid.Parse("55555555-5555-4555-8555-555555555555");
@@ -99,6 +108,40 @@ public sealed class DemoSeeder(AppDbContext db, IPasswordHasher<User> passwordHa
             CompetitorImparatulId, "Hotel Împăratul Romanilor", "https://www.booking.com/hotel/ro/imparatul-romanilor.html", ct);
         inserted += await AddCompetitorIfMissingAsync(
             CompetitorLuxemburgId, "Casa Luxemburg", "https://www.booking.com/hotel/ro/casa-luxemburg.html", ct);
+
+        // Empty second world: a tenant + owner with nothing set up yet, so signing in as
+        // new@pricepilot.local lands on the brand-new-owner onboarding flow. No property,
+        // room types, or competitors are seeded for it on purpose.
+        if (!await db.Tenants.AnyAsync(t => t.Id == NewOwnerTenantId, ct))
+        {
+            db.Tenants.Add(new Tenant
+            {
+                Id = NewOwnerTenantId,
+                Name = "Hotel Nou Demo SRL",
+                SubscriptionPlan = "demo",
+                SubscriptionStatus = "active",
+                CreatedAt = SeedCreatedAt,
+            });
+            inserted++;
+        }
+
+        // System code: see class-level note on IgnoreQueryFilters.
+        if (!await db.Users.IgnoreQueryFilters().AnyAsync(u => u.Id == NewOwnerUserId, ct))
+        {
+            var newOwner = new User
+            {
+                Id = NewOwnerUserId,
+                TenantId = NewOwnerTenantId,
+                Email = User.NormalizeEmail(NewOwnerEmail),
+                DisplayName = "New Owner",
+                PasswordHash = "",
+                Role = "owner",
+                CreatedAt = SeedCreatedAt,
+            };
+            newOwner.PasswordHash = passwordHasher.HashPassword(newOwner, NewOwnerPassword);
+            db.Users.Add(newOwner);
+            inserted++;
+        }
 
         await db.SaveChangesAsync(ct);
         logger.LogInformation("Demo seed complete: {Inserted} row(s) inserted, the rest already existed.", inserted);

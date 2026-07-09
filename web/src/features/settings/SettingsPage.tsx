@@ -7,111 +7,44 @@ import {
   useProperties,
   useResolveProperty,
 } from '../../api/hooks';
+import { clearSetupDismissed } from '../../app/setupState';
+import { AsyncStatus } from '../../components/AsyncStatus';
 import { Money } from '../../components/Money';
+import { PlacePicker } from '../../components/PlacePicker';
 import { EmptyState, ErrorState, LoadingState } from '../../components/States';
+import { formatRating } from '../../components/formatRating';
 import type { Property } from '../../api/types';
 
-/** "★ 4.5 (200 reviews)", or null when there is no rating on file yet. */
-function formatRating(rating?: number, ratingCount?: number): string | null {
-  if (typeof rating !== 'number') return null;
-  const count =
-    typeof ratingCount === 'number'
-      ? ` (${ratingCount} review${ratingCount === 1 ? '' : 's'})`
-      : '';
-  return `★ ${rating.toFixed(1)}${count}`;
-}
-
-/**
- * Candidate picker + free-text re-search, shared by the "resolved" (tucked
- * under "Not the right place?") and "failed" (shown directly) property card
- * states. One hook instance per property card keeps mutation state isolated
- * when several properties render at once.
- */
-function PlaceCorrection({ property }: { property: Property }) {
+function PropertyCard({ property }: { property: Property }) {
   const pickPlace = usePickPlace();
   const resolveProperty = useResolveProperty();
-  const [selectedCandidate, setSelectedCandidate] = useState('');
-  const [query, setQuery] = useState('');
-
-  return (
-    <div className="place-correction">
-      {property.placeCandidates.length > 0 && (
-        <form
-          className="stacked-form"
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (!selectedCandidate) return;
-            pickPlace.mutate({ propertyId: property.id, placeId: selectedCandidate });
-          }}
-        >
-          <fieldset className="field">
-            <legend>Pick the right place</legend>
-            {property.placeCandidates.map((candidate) => {
-              const ratingText = formatRating(candidate.rating, candidate.ratingCount);
-              return (
-                <label key={candidate.placeId} className="candidate-option">
-                  <input
-                    type="radio"
-                    name={`place-candidate-${property.id}`}
-                    value={candidate.placeId}
-                    checked={selectedCandidate === candidate.placeId}
-                    onChange={() => setSelectedCandidate(candidate.placeId)}
-                  />
-                  <span>
-                    {candidate.name}
-                    {candidate.formattedAddress && ` · ${candidate.formattedAddress}`}
-                    {ratingText && ` · ${ratingText}`}
-                  </span>
-                </label>
-              );
-            })}
-          </fieldset>
-          <button
-            type="submit"
-            className="btn btn-secondary"
-            disabled={!selectedCandidate || pickPlace.isPending}
-          >
-            Use this place
-          </button>
-          {pickPlace.isError && <ErrorState error={pickPlace.error} />}
-        </form>
-      )}
-
-      <form
-        className="stacked-form"
-        onSubmit={(event) => {
-          event.preventDefault();
-          resolveProperty.mutate({
-            propertyId: property.id,
-            query: query.trim() === '' ? undefined : query.trim(),
-          });
-        }}
-      >
-        <label className="field">
-          Search by a different name
-          <input
-            type="text"
-            value={query}
-            placeholder="e.g. Pensiunea Rustic, Brașov"
-            onChange={(event) => setQuery(event.target.value)}
-          />
-        </label>
-        <button type="submit" className="btn btn-secondary" disabled={resolveProperty.isPending}>
-          Search again
-        </button>
-        {resolveProperty.isError && <ErrorState error={resolveProperty.error} />}
-        {resolveProperty.isSuccess && (
-          <p className="state state-loading" role="status">
-            Searching Google again — this can take a minute.
-          </p>
-        )}
-      </form>
-    </div>
-  );
-}
-
-function PropertyCard({ property }: { property: Property }) {
   const ratingText = formatRating(property.rating, property.ratingCount);
+
+  // The "search by a different name" field always submits a string (an
+  // empty one means "search again using the property's own name") —
+  // convert '' to undefined so useResolveProperty falls back to that.
+  function research(query: string) {
+    resolveProperty.mutate({
+      propertyId: property.id,
+      query: query === '' ? undefined : query,
+    });
+  }
+
+  // Candidate picker + free-text re-search, shared by the "resolved"
+  // (tucked under "Not the right place?") and "failed" (shown directly)
+  // states. Built once so the pending/error rendering isn't duplicated.
+  const picker = (
+    <>
+      <PlacePicker
+        candidates={property.placeCandidates}
+        pending={pickPlace.isPending || resolveProperty.isPending}
+        onPick={(placeId) => pickPlace.mutate({ propertyId: property.id, placeId })}
+        onResearch={research}
+      />
+      {pickPlace.isError && <ErrorState error={pickPlace.error} />}
+      {resolveProperty.isError && <ErrorState error={resolveProperty.error} />}
+    </>
+  );
 
   return (
     <div className="property-block">
@@ -120,9 +53,11 @@ function PropertyCard({ property }: { property: Property }) {
       </h4>
 
       {property.placeStatus === 'unresolved' && (
-        <p className="state state-loading" role="status">
-          Finding your place on Google…
-        </p>
+        <AsyncStatus
+          phase="working"
+          workingText="Finding your place on Google…"
+          onRetry={() => resolveProperty.mutate({ propertyId: property.id })}
+        />
       )}
 
       {property.placeStatus === 'resolved' && (
@@ -146,14 +81,21 @@ function PropertyCard({ property }: { property: Property }) {
       {property.placeStatus === 'resolved' && (
         <details className="place-correction-toggle">
           <summary>Not the right place?</summary>
-          <PlaceCorrection property={property} />
+          {picker}
         </details>
       )}
 
-      {property.placeStatus === 'failed' && <PlaceCorrection property={property} />}
+      {property.placeStatus === 'failed' && picker}
 
       {property.roomTypes.length === 0 ? (
-        <EmptyState message="No room types configured for this property." />
+        <EmptyState
+          message="You haven't added a room type yet."
+          action={{
+            label: 'Add a room type',
+            to: '/setup',
+            onClick: () => clearSetupDismissed(),
+          }}
+        />
       ) : (
         <table className="data-table">
           <caption className="visually-hidden">Room types for {property.name}</caption>
@@ -197,8 +139,8 @@ function AddPropertyForm() {
     <section className="panel">
       <h3>Add your property</h3>
       <p className="page-intro">
-        Tell us the name and city, and we&apos;ll find it on Google automatically
-        — then start watching nearby competitors for you.
+        Tell us the name and city, and we&apos;ll find it on Google
+        automatically — then start keeping an eye on nearby hotels for you.
       </p>
       <form
         className="stacked-form"
@@ -264,16 +206,16 @@ export function SettingsPage() {
 
   return (
     <div className="page">
-      <h2>Settings</h2>
+      <h2>Your hotel</h2>
 
       <AddPropertyForm />
 
       <section className="panel">
         <h3>Your properties and base prices</h3>
         <p className="page-intro">
-          Base prices are the starting point for every recommendation. Editing
-          them here is coming soon — for now they are managed by your onboarding
-          contact.
+          Base prices are the starting point for every price we suggest.
+          Editing them here is coming soon — for now they&apos;re managed by
+          your onboarding contact.
         </p>
         {properties.isPending && <LoadingState what="your properties" />}
         {properties.isError && <ErrorState error={properties.error} />}

@@ -50,8 +50,8 @@ export function LoginPage() {
               Prices your whole street can’t argue with.
             </p>
             <p className="login-tagline-sub">
-              Competitor rates, local events and demand — read for you every
-              morning, before your first coffee.
+              Nearby hotel rates, local events and demand — read for you
+              every morning, before your first coffee.
             </p>
           </div>
         </section>
@@ -60,7 +60,7 @@ export function LoginPage() {
           <h1 className="login-title">Welcome back</h1>
           <HandUnderline width={146} />
           <p className="page-intro">
-            Sign in to see your prices, competitors and recommendations.
+            Sign in to see your prices, nearby hotels and what&apos;s coming up.
           </p>
 
           <form className="stacked-form" onSubmit={handleSubmit}>
@@ -103,11 +103,13 @@ export function LoginPage() {
 
           {import.meta.env.DEV && (
             <aside className="login-hint">
-              <strong>Demo account (dev only):</strong>
+              <strong>Demo accounts (dev only):</strong>
               <br />
-              Email: <code>demo@pricepilot.local</code>
+              Existing owner: <code>demo@pricepilot.local</code>
               <br />
-              Password: <code>Demo1234!</code>
+              Brand-new owner (onboarding): <code>new@pricepilot.local</code>
+              <br />
+              Password (both): <code>Demo1234!</code>
             </aside>
           )}
         </section>

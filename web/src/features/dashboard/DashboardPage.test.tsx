@@ -1,8 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
-import { DashboardPage, greetingForHour } from './DashboardPage';
+import { DashboardPage, greetingForHour, refreshStepsText } from './DashboardPage';
+import { SetupGuard } from '../setup/SetupGuard';
+import { dismissSetup, isSetupDismissed } from '../../app/setupState';
 import { PropertyProvider } from '../../app/PropertyContext';
 import { renderWithProviders } from '../../test/renderWithProviders';
+import type { ExtraRoute } from '../../test/renderWithProviders';
 import { setSession } from '../../auth/session';
 import { fixtureRecommendation } from '../../test/fixtures';
 import type { Property, UserInfo } from '../../api/types';
@@ -40,6 +43,25 @@ function jsonResponse(payload: unknown, status = 200) {
   });
 }
 
+/** A promise plus its resolve/reject, for tests that need to control exactly
+ * when a mocked fetch settles (so we can observe mid-sequence UI). */
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
+function queuedJobResponse(id: string, type: string) {
+  return jsonResponse(
+    { id, type, status: 'queued', createdAt: new Date().toISOString() },
+    202,
+  );
+}
+
 interface JobBody {
   type: string;
   payload?: Record<string, unknown>;
@@ -47,9 +69,11 @@ interface JobBody {
 
 const fetchMock = vi.fn<typeof fetch>();
 let jobBodies: JobBody[] = [];
+let propertyRows: Property[] = [];
 
 beforeEach(() => {
   jobBodies = [];
+  propertyRows = [property];
   vi.stubGlobal('fetch', fetchMock);
   fetchMock.mockImplementation(async (input, init) => {
     const url =
@@ -76,7 +100,7 @@ beforeEach(() => {
       return jsonResponse([fixtureRecommendation]);
     }
     if (url.endsWith('/properties')) {
-      return jsonResponse([property]);
+      return jsonResponse(propertyRows);
     }
     if (url.includes('/events')) {
       return jsonResponse([]);
@@ -96,11 +120,12 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function renderDashboard(nowHour: number) {
+function renderDashboard(nowHour: number, routes: ExtraRoute[] = []) {
   return renderWithProviders(
     <PropertyProvider>
       <DashboardPage nowHour={nowHour} />
     </PropertyProvider>,
+    { route: '/', path: '/', routes },
   );
 }
 
@@ -113,6 +138,17 @@ describe('greetingForHour', () => {
     expect(greetingForHour(18)).toBe('Good evening');
     expect(greetingForHour(23)).toBe('Good evening');
     expect(greetingForHour(2)).toBe('Good evening');
+  });
+});
+
+describe('refreshStepsText', () => {
+  it('ticks each step to ✓ once its slot has resolved, shows … on the one in flight', () => {
+    expect(refreshStepsText('idle')).toBe("Prices · What's on · Recalculating");
+    expect(refreshStepsText('rates')).toBe("Prices… · What's on · Recalculating");
+    expect(refreshStepsText('events')).toBe("Prices ✓ · What's on… · Recalculating");
+    expect(refreshStepsText('engine')).toBe("Prices ✓ · What's on ✓ · Recalculating…");
+    expect(refreshStepsText('done')).toBe("Prices ✓ · What's on ✓ · Recalculating ✓");
+    expect(refreshStepsText('failed')).toBe("Prices · What's on · Recalculating");
   });
 });
 
@@ -134,9 +170,25 @@ describe('DashboardPage', () => {
     ).toBeInTheDocument();
   });
 
+  it('uses plain-language card titles, with an inline explainer on "Extra income if you accept all"', async () => {
+    renderDashboard(9);
+    await screen.findByRole('heading', { name: 'Good morning, Ana' });
+
+    expect(screen.getByRole('heading', { name: 'Prices to review' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: /extra income if you accept all/i }),
+    ).toBeInTheDocument();
+
+    const trigger = screen.getByRole('button', {
+      name: /what does "extra income if you accept all" mean\?/i,
+    });
+    fireEvent.click(trigger);
+    expect(screen.getByRole('tooltip')).toHaveTextContent(/waiting for your decision/i);
+  });
+
   it('refresh enqueues the three pipeline jobs in order with their payloads', async () => {
     renderDashboard(9);
-    const button = await screen.findByRole('button', { name: /refresh data now/i });
+    const button = await screen.findByRole('button', { name: /check for new prices/i });
 
     fireEvent.click(button);
 
@@ -158,16 +210,68 @@ describe('DashboardPage', () => {
       horizon_days: 90,
     });
 
-    // Once all three are accepted the button settles and the owner is told.
+    // Once all three are accepted the button re-enables and the status
+    // region (a11y: role="status") shows every step ticked off.
     await waitFor(() => {
       expect(
-        screen.getByRole('button', { name: /refresh data now/i }),
+        screen.getByRole('button', { name: /check for new prices/i }),
       ).toBeEnabled();
     });
-    expect(screen.getByRole('status')).toHaveTextContent(/refresh queued/i);
+    expect(screen.getByRole('status')).toHaveTextContent(
+      "Prices ✓ · What's on ✓ · Recalculating ✓",
+    );
   });
 
-  it('a failing job in the refresh sequence stops it, shows the error, and re-enables', async () => {
+  it('shows the 3-step progress ticking to done as each job resolves in turn', async () => {
+    const jobDeferreds = [deferred<Response>(), deferred<Response>(), deferred<Response>()];
+    let callIndex = 0;
+    fetchMock.mockImplementation(async (input, init) => {
+      const url =
+        typeof input === 'string'
+          ? input
+          : input instanceof URL
+            ? input.toString()
+            : input.url;
+      const method = init?.method ?? 'GET';
+      if (method === 'POST' && url.endsWith('/jobs')) {
+        const body = JSON.parse(String(init?.body)) as JobBody;
+        jobBodies.push(body);
+        return jobDeferreds[callIndex++].promise;
+      }
+      if (url.includes('/recommendations')) return jsonResponse([fixtureRecommendation]);
+      if (url.endsWith('/properties')) return jsonResponse(propertyRows);
+      if (url.includes('/events')) return jsonResponse([]);
+      throw new Error(`Unexpected fetch in test: ${method} ${url}`);
+    });
+
+    renderDashboard(9);
+    fireEvent.click(await screen.findByRole('button', { name: /check for new prices/i }));
+
+    // Rates in flight; nothing else has started yet.
+    await waitFor(() => {
+      expect(screen.getByText("Prices… · What's on · Recalculating")).toBeInTheDocument();
+    });
+
+    jobDeferreds[0].resolve(queuedJobResponse('j1', 'scrape.competitor_rates'));
+    await waitFor(() => {
+      expect(screen.getByText("Prices ✓ · What's on… · Recalculating")).toBeInTheDocument();
+    });
+
+    jobDeferreds[1].resolve(queuedJobResponse('j2', 'ingest.events'));
+    await waitFor(() => {
+      expect(screen.getByText("Prices ✓ · What's on ✓ · Recalculating…")).toBeInTheDocument();
+    });
+
+    jobDeferreds[2].resolve(queuedJobResponse('j3', 'engine.generate_recommendations'));
+    await waitFor(() => {
+      expect(screen.getByText("Prices ✓ · What's on ✓ · Recalculating ✓")).toBeInTheDocument();
+    });
+    expect(
+      screen.getByRole('button', { name: /check for new prices/i }),
+    ).toBeEnabled();
+  });
+
+  it('a failing job in the refresh sequence stops it, shows the failed state, and re-enables', async () => {
     fetchMock.mockImplementation(async (input, init) => {
       const url =
         typeof input === 'string'
@@ -195,7 +299,7 @@ describe('DashboardPage', () => {
     });
 
     renderDashboard(9);
-    const button = await screen.findByRole('button', { name: /refresh data now/i });
+    const button = await screen.findByRole('button', { name: /check for new prices/i });
     fireEvent.click(button);
 
     await waitFor(() => {
@@ -205,9 +309,126 @@ describe('DashboardPage', () => {
       'scrape.competitor_rates',
       'ingest.events', // failed here — the sequence stopped
     ]);
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      "We couldn't refresh your prices just now.",
+    );
     expect(
-      screen.getByRole('button', { name: /refresh data now/i }),
+      screen.getByRole('button', { name: /check for new prices/i }),
     ).toBeEnabled();
-    expect(screen.queryByText(/refresh queued/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument();
+  });
+
+  it('"Try again" after a failure re-runs the whole refresh sequence from the start', async () => {
+    let eventsAlreadyFailedOnce = false;
+    fetchMock.mockImplementation(async (input, init) => {
+      const url =
+        typeof input === 'string'
+          ? input
+          : input instanceof URL
+            ? input.toString()
+            : input.url;
+      const method = init?.method ?? 'GET';
+      if (method === 'POST' && url.endsWith('/jobs')) {
+        const body = JSON.parse(String(init?.body)) as JobBody;
+        jobBodies.push(body);
+        if (body.type === 'ingest.events' && !eventsAlreadyFailedOnce) {
+          eventsAlreadyFailedOnce = true;
+          return jsonResponse({ error: 'boom' }, 500);
+        }
+        return jsonResponse(
+          { id: '00000000-0000-4000-8000-000000000001', type: body.type, status: 'queued', createdAt: new Date().toISOString() },
+          202,
+        );
+      }
+      if (url.includes('/recommendations')) return jsonResponse([fixtureRecommendation]);
+      if (url.endsWith('/properties')) return jsonResponse([property]);
+      if (url.includes('/events')) return jsonResponse([]);
+      throw new Error(`Unexpected fetch in test: ${method} ${url}`);
+    });
+
+    renderDashboard(9);
+    fireEvent.click(await screen.findByRole('button', { name: /check for new prices/i }));
+
+    const retryButton = await screen.findByRole('button', { name: /try again/i });
+    fireEvent.click(retryButton);
+
+    await waitFor(() => {
+      expect(jobBodies.map((body) => body.type)).toEqual([
+        'scrape.competitor_rates',
+        'ingest.events',
+        'scrape.competitor_rates',
+        'ingest.events',
+        'engine.generate_recommendations',
+      ]);
+    });
+    expect(screen.getByRole('status')).toHaveTextContent(
+      "Prices ✓ · What's on ✓ · Recalculating ✓",
+    );
+  });
+});
+
+describe('DashboardPage — no property yet', () => {
+  it('auto-redirects a brand-new (zero properties, not dismissed) owner into /setup', async () => {
+    propertyRows = [];
+    renderDashboard(9, [{ path: '/setup', element: <p>setup wizard</p> }]);
+
+    expect(await screen.findByText('setup wizard')).toBeInTheDocument();
+  });
+
+  it('a dismissed, zero-property session shows the re-enter CTA and does NOT redirect', async () => {
+    propertyRows = [];
+    dismissSetup();
+    renderDashboard(9, [{ path: '/setup', element: <p>setup wizard</p> }]);
+
+    expect(
+      await screen.findByRole('heading', { name: "Let's set up your hotel" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('setup wizard')).not.toBeInTheDocument();
+    const link = screen.getByRole('link', { name: /start setup/i });
+    expect(link).toHaveAttribute('href', '/setup');
+  });
+
+  it('clicking the re-enter CTA clears the dismissed flag and heads to /setup', async () => {
+    propertyRows = [];
+    dismissSetup();
+    renderDashboard(9, [{ path: '/setup', element: <p>setup wizard</p> }]);
+
+    fireEvent.click(await screen.findByRole('link', { name: /start setup/i }));
+    expect(isSetupDismissed()).toBe(false);
+    expect(await screen.findByText('setup wizard')).toBeInTheDocument();
+  });
+});
+
+describe('DashboardPage — resume nudge (property present but setup unfinished)', () => {
+  const resolvedNoRooms: Property = { ...property, placeStatus: 'resolved', roomTypes: [] };
+
+  it('shows a "Finish setting up" link when the property has no room types yet', async () => {
+    propertyRows = [resolvedNoRooms];
+    renderDashboard(9);
+
+    const link = await screen.findByRole('link', { name: /finish setting up/i });
+    expect(link).toHaveAttribute('href', '/setup');
+  });
+
+  it('does not show the resume nudge for a fully set-up property', async () => {
+    propertyRows = [property]; // resolved + has a room type
+    renderDashboard(9);
+
+    await screen.findByRole('heading', { name: /good morning/i });
+    expect(screen.queryByRole('link', { name: /finish setting up/i })).not.toBeInTheDocument();
+  });
+});
+
+describe('DashboardPage — no redirect loop', () => {
+  it('zero-property, not-dismissed owner settles on the wizard (dashboard → /setup → wizard, terminates)', async () => {
+    // The dashboard redirects / → /setup (zero props, not dismissed); the guard
+    // renders the wizard rather than bouncing back — so this terminates at
+    // step 1 instead of ping-ponging.
+    propertyRows = [];
+    renderDashboard(9, [{ path: '/setup', element: <SetupGuard /> }]);
+
+    expect(
+      await screen.findByRole('heading', { name: "What's your hotel called?" }),
+    ).toBeInTheDocument();
   });
 });

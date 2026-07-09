@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { LoginPage } from './LoginPage';
 import { getSession } from '../../auth/session';
+import { dismissSetup, isSetupDismissed } from '../../app/setupState';
 import type { UserInfo } from '../../api/types';
 import { renderWithProviders } from '../../test/renderWithProviders';
 
@@ -63,6 +64,28 @@ describe('LoginPage', () => {
     expect(getSession()?.user.displayName).toBe('Demo Owner');
   });
 
+  it('clears a stale setup-dismissed flag on successful login (new identity)', async () => {
+    // A previous owner may have left the flag set on this browser; a
+    // brand-new (zero-property) owner signing in must be re-prompted into
+    // onboarding, so login clears it.
+    dismissSetup();
+    const expiresAt = new Date(Date.now() + 3_600_000).toISOString();
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ token: 'jwt-abc', expiresAt, user }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+
+    renderLoginPage();
+    submitCredentials('new@pricepilot.local', 'Demo1234!');
+
+    await waitFor(() => {
+      expect(screen.getByText('dashboard home')).toBeInTheDocument();
+    });
+    expect(isSetupDismissed()).toBe(false);
+  });
+
   it('shows the Romanian credentials error on 401', async () => {
     fetchMock.mockResolvedValueOnce(
       new Response('', { status: 401, statusText: 'Unauthorized' }),
@@ -78,10 +101,11 @@ describe('LoginPage', () => {
     expect(screen.queryByText('dashboard home')).not.toBeInTheDocument();
   });
 
-  it('shows the demo credentials hint in dev builds', () => {
+  it('shows the demo + onboarding credentials hint in dev builds', () => {
     // Vitest runs with import.meta.env.DEV === true, like `npm run dev`.
     renderLoginPage();
     expect(screen.getByText(/demo@pricepilot\.local/)).toBeInTheDocument();
+    expect(screen.getByText(/new@pricepilot\.local/)).toBeInTheDocument();
     expect(screen.getByText(/Demo1234!/)).toBeInTheDocument();
   });
 });

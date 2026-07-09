@@ -5,6 +5,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch, login } from './client';
+import { clearSetupDismissed } from '../app/setupState';
 import type {
   Competitor,
   EventItem,
@@ -16,6 +17,8 @@ import type {
   PropertyCreate,
   Recommendation,
   ResolvePlace,
+  RoomType,
+  RoomTypeCreate,
 } from './types';
 
 export function useLogin() {
@@ -23,7 +26,11 @@ export function useLogin() {
   return useMutation({
     mutationFn: ({ email, password }: LoginRequest) => login(email, password),
     onSuccess: () => {
-      // A new identity invalidates everything cached for the previous one.
+      // A new identity: clear the previous owner's local "setup dismissed"
+      // milestone (a zero-property returner should be re-prompted into
+      // onboarding; a with-property owner is never redirected anyway) and
+      // invalidate everything cached for the previous one.
+      clearSetupDismissed();
       void queryClient.invalidateQueries();
     },
   });
@@ -59,6 +66,17 @@ export function useCreateProperty() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['properties'] });
     },
+  });
+}
+
+export function useCreateRoomType() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ propertyId, body }: { propertyId: string; body: RoomTypeCreate }) =>
+      apiFetch<RoomType>(`/properties/${propertyId}/room-types`, {
+        method: 'POST', body: JSON.stringify(body),
+      }),
+    onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ['properties'] }); },
   });
 }
 
@@ -102,10 +120,22 @@ export function useResolveProperty() {
   });
 }
 
+export interface UseRecommendationsOptions {
+  /**
+   * Opt-in polling (e.g. the setup wizard waiting for the very first
+   * recommendation to land after triggering the pricing pipeline). Off by
+   * default — a property with zero *pending* recommendations is a normal,
+   * often permanent "all caught up" state on the Dashboard/Recommendations
+   * pages, not a transient one worth polling forever.
+   */
+  poll?: boolean;
+}
+
 export function useRecommendations(
   propertyId: string | undefined,
   from?: string,
   to?: string,
+  options: UseRecommendationsOptions = {},
 ) {
   return useQuery({
     queryKey: ['recommendations', propertyId, from ?? null, to ?? null],
@@ -120,6 +150,7 @@ export function useRecommendations(
         `/properties/${propertyId}/recommendations${query ? `?${query}` : ''}`,
       );
     },
+    refetchInterval: options.poll ? 3000 : false,
   });
 }
 
@@ -142,7 +173,28 @@ export function useUpdateRecommendationStatus() {
   });
 }
 
-export function useCompetitors(propertyId: string | undefined) {
+/**
+ * How often to re-poll competitors WHILE the caller has opted into polling:
+ * every 3s until at least one competitor is on record, then stop. Only the
+ * setup wizard's step 4 opts in (the discover_competitors job, chain-enqueued
+ * from resolve_place — see shared/contracts/jobs.md — may not have landed yet).
+ * Off by default everywhere else: on the Competitors page "zero competitors"
+ * is a normal, possibly permanent state (a hotel may have none, or the owner
+ * may untrack them all), so polling forever there would be wrong.
+ */
+export function competitorsRefetchInterval(competitors: Competitor[] | undefined): number | false {
+  return (competitors?.length ?? 0) === 0 ? 3000 : false;
+}
+
+export interface UseCompetitorsOptions {
+  /** Opt into 3s polling while the list is empty (setup wizard step 4). */
+  poll?: boolean;
+}
+
+export function useCompetitors(
+  propertyId: string | undefined,
+  { poll = false }: UseCompetitorsOptions = {},
+) {
   return useQuery({
     queryKey: ['competitors', propertyId],
     enabled: Boolean(propertyId),
@@ -150,6 +202,7 @@ export function useCompetitors(propertyId: string | undefined) {
       if (!propertyId) throw new Error('propertyId is required');
       return apiFetch<Competitor[]>(`/properties/${propertyId}/competitors`);
     },
+    refetchInterval: (query) => (poll ? competitorsRefetchInterval(query.state.data) : false),
   });
 }
 

@@ -1,8 +1,9 @@
 /**
  * Month price calendar (design handoff screen 3): one cell per night with the
- * server's price, the competitor band caption and a position marker colored
- * by where the price sits in the band. Days with a pending recommendation are
- * buttons that jump to the matching card below. No animation — by design.
+ * server's price, the nearby-hotels price-range caption and a position marker
+ * colored by where the price sits in that range. Days with a pending
+ * recommendation are buttons that jump to the matching card below. No
+ * animation — by design.
  *
  * All derivation lives in calendarModel.ts (pure, unit-tested); this file is
  * presentation only.
@@ -10,6 +11,7 @@
 
 import { useState } from 'react';
 import { formatMoney, formatMoneyBare } from '../../components/Money';
+import { Explainer } from '../../components/Explainer';
 import { IconChevronLeft, IconChevronRight, IconSpire } from '../../components/icons';
 import type { CalendarDay, CalendarRow } from './calendarModel';
 import {
@@ -114,6 +116,10 @@ export function PriceCalendar({ rows, propertyName, onDayClick }: PriceCalendarP
           <span className="cal-caption">
             {propertyName} · {room}
           </span>
+          <Explainer label="the price range">
+            This is what nearby hotels charge for the same night — the
+            lowest and highest rate we found among them.
+          </Explainer>
           <span className="cal-nav">
             <button
               type="button"

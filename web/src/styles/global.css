@@ -1408,6 +1408,233 @@ details.place-correction-toggle summary {
   white-space: nowrap;
 }
 
+/* --- Shared UX primitives: AsyncStatus, Explainer, PlacePicker ----------- */
+
+.async-status {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.async-status p {
+  margin: 0;
+}
+
+.async-status-working {
+  padding: var(--space-4);
+  border-radius: var(--radius);
+  background: var(--color-neutral-chip-bg);
+  color: var(--color-text-muted);
+}
+
+.async-status-working::before {
+  content: '';
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: var(--space-2);
+  border: 2px solid var(--terracotta);
+  border-top-color: transparent;
+  border-radius: 50%;
+  vertical-align: -1px;
+  animation: async-status-spin 0.8s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .async-status-working::before {
+    animation: none;
+  }
+}
+
+@keyframes async-status-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.async-status-done {
+  padding: var(--space-4);
+  border-radius: var(--radius);
+  background: var(--color-positive-bg);
+  color: var(--color-positive);
+}
+
+.async-status-failed {
+  padding: var(--space-4);
+  border-radius: var(--radius);
+  background: var(--color-negative-bg);
+  color: var(--color-negative);
+  display: grid;
+  gap: var(--space-3);
+}
+
+.async-status-actions {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.explainer {
+  position: relative;
+  display: inline-flex;
+}
+
+.explainer-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1.5px solid var(--terracotta);
+  background: var(--bg-card);
+  color: var(--terracotta-ink);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: var(--text-base);
+  cursor: pointer;
+}
+
+.explainer-trigger:hover {
+  background: var(--terracotta-wash);
+}
+
+.explainer-popover {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + var(--space-2));
+  left: 0;
+  width: max-content;
+  max-width: 18rem;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius);
+  border: 1.5px solid var(--line);
+  background: var(--bg-card);
+  box-shadow: var(--shadow);
+  color: var(--color-text);
+  font-size: var(--text-base);
+  line-height: var(--leading);
+}
+
+.place-picker {
+  display: grid;
+  gap: var(--space-4);
+}
+
+/* --- Setup wizard (full-screen onboarding, outside the app Layout) ------- */
+
+.setup {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-6) var(--space-5);
+  background: var(--bg-paper);
+}
+
+.setup-shell {
+  width: 100%;
+  max-width: 34rem;
+  background: var(--bg-card);
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-hero);
+  padding: 40px 44px 36px;
+}
+
+.setup-progress {
+  display: flex;
+  justify-content: center;
+  margin-bottom: var(--space-6);
+}
+
+.setup-dots {
+  display: inline-flex;
+  gap: 10px;
+}
+
+.setup-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--line);
+}
+
+.setup-dot-filled {
+  background: var(--terracotta);
+}
+
+.setup-step h1 {
+  font-size: var(--text-2xl);
+}
+
+.setup-step .stacked-form {
+  max-width: none;
+  margin-top: var(--space-5);
+}
+
+/* Step 4: discovered competitors (name + rating), read-only list */
+.discovered-list {
+  list-style: none;
+  padding: 0;
+  margin: var(--space-5) 0;
+  display: grid;
+  gap: var(--space-3);
+}
+
+.discovered-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-3);
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+}
+
+.discovered-item-name {
+  font-weight: 600;
+}
+
+.discovered-item-rating {
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+/* Step 5: the first recommendation, shown inline in the wizard */
+.setup-first-price {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-5);
+}
+
+.setup-first-price .btn {
+  margin-top: var(--space-3);
+  justify-self: start;
+}
+
+.setup-skip {
+  display: block;
+  margin: var(--space-6) auto 0;
+}
+
+/* Dashboard resume nudge: quiet "finish setting up" banner for an owner who
+   backgrounded out of the wizard with an unfinished property. */
+.resume-nudge {
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius);
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
+.resume-nudge a {
+  color: var(--terracotta-ink);
+  font-weight: 700;
+}
+
 /* --- Townscape animation (login hero ONLY — data screens have no animation) --- */
 
 @keyframes ts-cloud-drift-a {

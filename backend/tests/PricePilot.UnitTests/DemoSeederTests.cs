@@ -26,6 +26,9 @@ public sealed class DemoSeederTests : IDisposable
     private static readonly Guid CompetitorRamadaId = Guid.Parse("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
     private static readonly Guid CompetitorImparatulId = Guid.Parse("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
     private static readonly Guid CompetitorLuxemburgId = Guid.Parse("cccccccc-cccc-4ccc-8ccc-cccccccccccc");
+    // Second, intentionally empty tenant for exercising the brand-new-owner / onboarding flow.
+    private static readonly Guid NewOwnerTenantId = Guid.Parse("66666666-6666-4666-8666-666666666666");
+    private static readonly Guid NewOwnerUserId = Guid.Parse("77777777-7777-4777-8777-777777777777");
 
     private readonly SqliteConnection _connection;
 
@@ -58,22 +61,33 @@ public sealed class DemoSeederTests : IDisposable
     {
         using var db = CreateContext();
 
-        Assert.Equal(1, db.Tenants.Count());
-        var tenant = db.Tenants.Single();
-        Assert.Equal(TenantId, tenant.Id);
+        Assert.Equal(2, db.Tenants.Count());
+        var tenant = db.Tenants.Single(t => t.Id == TenantId);
         Assert.Equal("Pensiunea Demo SRL", tenant.Name);
         Assert.Equal("demo", tenant.SubscriptionPlan);
+        var newOwnerTenant = db.Tenants.Single(t => t.Id == NewOwnerTenantId);
+        Assert.Equal("Hotel Nou Demo SRL", newOwnerTenant.Name);
+        Assert.Equal("demo", newOwnerTenant.SubscriptionPlan);
 
         // Tenant-owned tables are checked via IgnoreQueryFilters: this test context has no
         // resolved tenant on purpose (assertion-only code, mirrors admin/system usage).
-        Assert.Equal(1, db.Users.IgnoreQueryFilters().Count());
-        var user = db.Users.IgnoreQueryFilters().Single();
-        Assert.Equal(UserId, user.Id);
+        Assert.Equal(2, db.Users.IgnoreQueryFilters().Count());
+        var user = db.Users.IgnoreQueryFilters().Single(u => u.Id == UserId);
         Assert.Equal(TenantId, user.TenantId);
         Assert.Equal("demo@pricepilot.local", user.Email);
         Assert.Equal("owner", user.Role);
+        var newOwner = db.Users.IgnoreQueryFilters().Single(u => u.Id == NewOwnerUserId);
+        Assert.Equal(NewOwnerTenantId, newOwner.TenantId);
+        Assert.Equal("new@pricepilot.local", newOwner.Email);
+        Assert.Equal("owner", newOwner.Role);
 
+        // The new-owner tenant is intentionally empty — the whole point is to land on the
+        // brand-new-owner onboarding flow. All demo property/room/competitor rows belong to
+        // the original demo tenant only.
         Assert.Equal(1, db.Properties.IgnoreQueryFilters().Count());
+        Assert.Empty(db.Properties.IgnoreQueryFilters().Where(p => p.TenantId == NewOwnerTenantId));
+        Assert.Empty(db.RoomTypes.IgnoreQueryFilters().Where(r => r.TenantId == NewOwnerTenantId));
+        Assert.Empty(db.Competitors.IgnoreQueryFilters().Where(c => c.TenantId == NewOwnerTenantId));
         var property = db.Properties.IgnoreQueryFilters().Single();
         Assert.Equal(PropertyId, property.Id);
         Assert.Equal("Pensiunea Piața Mică", property.Name);
@@ -157,6 +171,20 @@ public sealed class DemoSeederTests : IDisposable
         var user = db.Users.IgnoreQueryFilters().Single(u => u.Id == UserId);
         var result = new PasswordHasher<User>().VerifyHashedPassword(user, user.PasswordHash, "Demo1234!");
         Assert.NotEqual(PasswordVerificationResult.Failed, result);
+    }
+
+    [Fact]
+    public async Task Seeded_new_owner_can_log_in_and_starts_with_no_property()
+    {
+        await RunSeederAsync();
+
+        using var db = CreateContext();
+        // System-code check, see comment in AssertExactContractState.
+        var newOwner = db.Users.IgnoreQueryFilters().Single(u => u.Id == NewOwnerUserId);
+        var result = new PasswordHasher<User>()
+            .VerifyHashedPassword(newOwner, newOwner.PasswordHash, "Demo1234!");
+        Assert.NotEqual(PasswordVerificationResult.Failed, result);
+        Assert.Empty(db.Properties.IgnoreQueryFilters().Where(p => p.TenantId == NewOwnerTenantId));
     }
 
     public void Dispose() => _connection.Dispose();

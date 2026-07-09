@@ -18,10 +18,10 @@ export function EventsPage() {
 
   return (
     <div className="page">
-      <h2>Events</h2>
+      <h2>What&apos;s on</h2>
       <p className="page-intro">
-        Concerts, festivals and holidays that drive demand for rooms in your
-        city. High-impact events feed directly into your price recommendations.
+        Concerts, festivals and holidays that bring visitors to your city —
+        the busiest ones directly shape the prices we suggest.
       </p>
 
       <form className="filters" onSubmit={(event) => event.preventDefault()}>
@@ -38,13 +38,13 @@ export function EventsPage() {
 
       {properties.isPending && !cityOverride && <LoadingState what="your city" />}
       {!city && !properties.isPending && (
-        <EmptyState message="Enter a city (or add a property in Settings) to see upcoming events." />
+        <EmptyState message="Type a city above to see what's coming up." />
       )}
 
       {city && events.isPending && <LoadingState what="events" />}
       {city && events.isError && <ErrorState error={events.error} />}
       {city && events.data && events.data.length === 0 && (
-        <EmptyState message={`No upcoming events found for ${city}.`} />
+        <EmptyState message={`Nothing's coming up in ${city} right now.`} />
       )}
 
       {city && events.data && events.data.length > 0 && (

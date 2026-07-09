@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import type { ComponentType } from 'react';
 import { clearSession, getActiveSession } from '../auth/session';
 import { useSelectedProperty, usePropertySelection } from '../app/PropertyContext';
+import { clearSetupDismissed } from '../app/setupState';
 import {
   IconCompetitors,
   IconDashboard,
@@ -21,11 +22,11 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { to: '/', label: 'Dashboard', end: true, icon: IconDashboard },
-  { to: '/recommendations', label: 'Recommendations', end: false, icon: IconRecommendations },
-  { to: '/competitors', label: 'Competitors', end: false, icon: IconCompetitors },
-  { to: '/events', label: 'Events', end: false, icon: IconEvents },
-  { to: '/settings', label: 'Settings', end: false, icon: IconSettings },
+  { to: '/', label: 'Home', end: true, icon: IconDashboard },
+  { to: '/recommendations', label: 'Prices to review', end: false, icon: IconRecommendations },
+  { to: '/competitors', label: 'Nearby hotels', end: false, icon: IconCompetitors },
+  { to: '/events', label: "What's on", end: false, icon: IconEvents },
+  { to: '/settings', label: 'Your hotel', end: false, icon: IconSettings },
 ];
 
 function PropertySelector() {
@@ -64,6 +65,10 @@ export function Layout() {
 
   function handleLogout() {
     clearSession();
+    // A different owner may sign in next on this browser: clear this owner's
+    // local "setup dismissed" milestone so a brand-new (zero-property) owner
+    // is auto-routed into /setup instead of seeing the stale CTA card.
+    clearSetupDismissed();
     // Drop everything cached for this user before the next sign-in.
     queryClient.clear();
     navigate('/login', { replace: true });

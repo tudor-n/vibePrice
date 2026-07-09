@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { useCompetitors, useUntrackCompetitor } from '../../api/hooks';
 import { useSelectedProperty } from '../../app/PropertyContext';
+import { clearSetupDismissed } from '../../app/setupState';
 import { FreshnessBadge } from '../../components/FreshnessBadge';
 import { Money } from '../../components/Money';
 import { EmptyState, ErrorState, LoadingState } from '../../components/States';
+import { formatRating } from '../../components/formatRating';
 import type { Competitor } from '../../api/types';
 
 const EARTH_RADIUS_KM = 6371;
@@ -26,16 +28,6 @@ export function haversineDistanceKm(
     Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return EARTH_RADIUS_KM * c;
-}
-
-/** "★ 4.3 (512 reviews)", or null when there is no rating on file yet. */
-function formatRating(rating?: number, ratingCount?: number): string | null {
-  if (typeof rating !== 'number') return null;
-  const count =
-    typeof ratingCount === 'number'
-      ? ` (${ratingCount} review${ratingCount === 1 ? '' : 's'})`
-      : '';
-  return `★ ${rating.toFixed(1)}${count}`;
 }
 
 function CompetitorRow({
@@ -65,17 +57,17 @@ function CompetitorRow({
       </p>
 
       {competitor.latestRates.length === 0 ? (
-        <EmptyState message="No rates captured yet for this competitor." />
+        <EmptyState message="No rates captured yet for this hotel." />
       ) : (
         <table className="data-table">
           <caption className="visually-hidden">
-            Latest scraped rates for {competitor.name}
+            Recent nightly rates for {competitor.name}
           </caption>
           <thead>
             <tr>
               <th scope="col">Stay date</th>
               <th scope="col">Nightly rate</th>
-              <th scope="col">Captured</th>
+              <th scope="col">Updated</th>
             </tr>
           </thead>
           <tbody>
@@ -96,7 +88,7 @@ function CompetitorRow({
 
       {confirming ? (
         <div className="untrack-confirm">
-          <p>This competitor stays removed from your tracking.</p>
+          <p>This hotel will no longer show up here.</p>
           <div className="rec-actions">
             <button
               type="button"
@@ -133,21 +125,27 @@ export function CompetitorsPage() {
   if (properties.isPending) return <LoadingState what="your properties" />;
   if (properties.isError) return <ErrorState error={properties.error} />;
   if (!properties.data || properties.data.length === 0) {
-    return <EmptyState message="Add a property in Settings before tracking competitors." />;
+    return (
+      <EmptyState
+        message="You haven't set up a hotel yet."
+        action={{
+          label: 'Set up your hotel',
+          to: '/setup',
+          onClick: () => clearSetupDismissed(),
+        }}
+      />
+    );
   }
 
   return (
     <div className="page">
-      <h2>Competitors</h2>
-      <p className="page-intro">
-        We automatically discover nearby competitors on Google and keep an
-        eye on their most recently scraped nightly rates.
-      </p>
+      <h2>Nearby hotels</h2>
+      <p className="page-intro">Hotels near you we keep an eye on.</p>
 
-      {competitors.isPending && <LoadingState what="competitors" />}
+      {competitors.isPending && <LoadingState what="nearby hotels" />}
       {competitors.isError && <ErrorState error={competitors.error} />}
       {competitors.data && competitors.data.length === 0 && (
-        <EmptyState message="No competitors discovered yet. Check back after your property is resolved on Google." />
+        <EmptyState message="We're still finding hotels near you — check back soon." />
       )}
 
       {competitors.data?.map((competitor) => {

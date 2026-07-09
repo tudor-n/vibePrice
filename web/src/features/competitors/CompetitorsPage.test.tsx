@@ -93,6 +93,20 @@ function renderPage() {
   );
 }
 
+/** Count of GET requests the page made to the competitors endpoint. */
+function competitorGetCount(): number {
+  return fetchMock.mock.calls.filter(([input, init]) => {
+    const url =
+      typeof input === 'string'
+        ? input
+        : input instanceof URL
+          ? input.toString()
+          : (input as Request).url;
+    const method = (init as RequestInit | undefined)?.method ?? 'GET';
+    return method === 'GET' && url.includes('/competitors');
+  }).length;
+}
+
 describe('haversineDistanceKm', () => {
   it('returns ~0 for the same point', () => {
     expect(haversineDistanceKm(45.7983, 24.1256, 45.7983, 24.1256)).toBeCloseTo(0, 5);
@@ -106,26 +120,50 @@ describe('haversineDistanceKm', () => {
   });
 });
 
+describe('CompetitorsPage — plain-language copy', () => {
+  it('titles the page "Nearby hotels" with a short, jargon-free intro', async () => {
+    renderPage();
+    expect(await screen.findByRole('heading', { name: 'Nearby hotels' })).toBeInTheDocument();
+    expect(screen.getByText('Hotels near you we keep an eye on.')).toBeInTheDocument();
+  });
+});
+
 describe('CompetitorsPage — states', () => {
   it('shows a loading state while properties load', () => {
     renderPage();
     expect(screen.getByText(/Loading your properties/)).toBeInTheDocument();
   });
 
-  it('shows an empty state when there are no properties', async () => {
+  it('shows an actionable empty state when there are no properties', async () => {
     fetchMock.mockImplementation(async (input) => {
       const url = typeof input === 'string' ? input : input.toString();
       if (url.endsWith('/properties')) return jsonResponse([]);
       throw new Error(`Unexpected fetch: ${url}`);
     });
     renderPage();
-    expect(await screen.findByText(/Add a property in Settings/)).toBeInTheDocument();
+    expect(await screen.findByText("You haven't set up a hotel yet.")).toBeInTheDocument();
+    const link = screen.getByRole('link', { name: /set up your hotel/i });
+    expect(link).toHaveAttribute('href', '/setup');
   });
 
-  it('shows an empty state when no competitors are discovered yet', async () => {
+  it('shows a plain "still finding hotels" message when none are discovered yet', async () => {
     competitorRows = [];
     renderPage();
-    expect(await screen.findByText(/No competitors discovered yet/)).toBeInTheDocument();
+    expect(await screen.findByText(/we're still finding hotels near you/i)).toBeInTheDocument();
+  });
+
+  it('does NOT poll competitors by default — a permanently-empty list is not refetched on an interval', async () => {
+    // Regression guard for the Important review finding: useCompetitors polling
+    // is opt-in ({ poll: true } only in the setup wizard). The Competitors page
+    // uses the default, so an empty list must not trigger an endless 3s refetch.
+    competitorRows = [];
+    renderPage();
+    await screen.findByText(/we're still finding hotels near you/i);
+    const countAfterMount = competitorGetCount();
+
+    // Wait past one 3s poll interval; with polling off the count stays put.
+    await new Promise((resolve) => setTimeout(resolve, 3500));
+    expect(competitorGetCount()).toBe(countAfterMount);
   });
 });
 
@@ -164,12 +202,12 @@ describe('CompetitorsPage — untrack with confirm', () => {
 
     fireEvent.click(within(row).getByRole('button', { name: 'Untrack' }));
     expect(
-      within(row).getByText('This competitor stays removed from your tracking.'),
+      within(row).getByText('This hotel will no longer show up here.'),
     ).toBeInTheDocument();
 
     fireEvent.click(within(row).getByRole('button', { name: 'Cancel' }));
     expect(
-      screen.queryByText('This competitor stays removed from your tracking.'),
+      screen.queryByText('This hotel will no longer show up here.'),
     ).not.toBeInTheDocument();
     expect(deletedIds).toEqual([]);
   });

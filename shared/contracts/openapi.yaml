@@ -63,6 +63,26 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Property" }
+  /properties/{propertyId}/room-types:
+    post:
+      summary: Add a room type to a property
+      parameters:
+        - { name: propertyId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RoomTypeCreate" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RoomType" }
+        "400":
+          description: "Validation failed: name blank, capacity < 1, basePrice/currentPrice not > 0 or more than 2 decimals, or currency not a 3-letter code"
+        "404":
+          description: Property does not belong to the caller's tenant (indistinguishable from a nonexistent id)
   /properties/{propertyId}/place:
     patch:
       summary: Pick a stored Google place candidate as the property's resolved place (owner correction)
@@ -275,6 +295,15 @@ components:
         name: { type: string }
         city: { type: string }
         address: { type: string }
+    RoomTypeCreate:
+      type: object
+      required: [name, capacity, basePrice]
+      properties:
+        name: { type: string }
+        capacity: { type: integer, minimum: 1 }
+        basePrice: { type: number, description: "> 0, at most 2 decimals" }
+        currentPrice: { type: number, nullable: true, description: "> 0, at most 2 decimals; defaults to basePrice" }
+        currency: { type: string, nullable: true, description: "3-letter ISO 4217 code; defaults to RON" }
     RoomType:
       type: object
       properties:
