@@ -169,17 +169,27 @@ export function useUpdateRecommendationStatus() {
 }
 
 /**
- * While a property has zero discovered competitors, the discover_competitors
- * job (chain-enqueued from resolve_place, see shared/contracts/jobs.md) may
- * simply not have landed yet. Poll every 3s so the setup wizard's step 4
- * (and any other page reading this list) clears itself without a manual
- * reload. Stops once at least one competitor is on record.
+ * How often to re-poll competitors WHILE the caller has opted into polling:
+ * every 3s until at least one competitor is on record, then stop. Only the
+ * setup wizard's step 4 opts in (the discover_competitors job, chain-enqueued
+ * from resolve_place — see shared/contracts/jobs.md — may not have landed yet).
+ * Off by default everywhere else: on the Competitors page "zero competitors"
+ * is a normal, possibly permanent state (a hotel may have none, or the owner
+ * may untrack them all), so polling forever there would be wrong.
  */
 export function competitorsRefetchInterval(competitors: Competitor[] | undefined): number | false {
   return (competitors?.length ?? 0) === 0 ? 3000 : false;
 }
 
-export function useCompetitors(propertyId: string | undefined) {
+export interface UseCompetitorsOptions {
+  /** Opt into 3s polling while the list is empty (setup wizard step 4). */
+  poll?: boolean;
+}
+
+export function useCompetitors(
+  propertyId: string | undefined,
+  { poll = false }: UseCompetitorsOptions = {},
+) {
   return useQuery({
     queryKey: ['competitors', propertyId],
     enabled: Boolean(propertyId),
@@ -187,7 +197,7 @@ export function useCompetitors(propertyId: string | undefined) {
       if (!propertyId) throw new Error('propertyId is required');
       return apiFetch<Competitor[]>(`/properties/${propertyId}/competitors`);
     },
-    refetchInterval: (query) => competitorsRefetchInterval(query.state.data),
+    refetchInterval: (query) => (poll ? competitorsRefetchInterval(query.state.data) : false),
   });
 }
 

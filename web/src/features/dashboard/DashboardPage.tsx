@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { useEvents, useRecommendations, useTriggerJob } from '../../api/hooks';
 import { useSelectedProperty } from '../../app/PropertyContext';
+import { clearSetupDismissed, isSetupDismissed } from '../setup/setupState';
 import { getActiveSession } from '../../auth/session';
 import { formatMoney } from '../../components/Money';
 import { EmptyState, ErrorState, LoadingState } from '../../components/States';
@@ -54,6 +55,14 @@ export function DashboardPage({ nowHour = new Date().getHours() }: DashboardPage
   if (properties.isPending) return <LoadingState what="your properties" />;
   if (properties.isError) return <ErrorState error={properties.error} />;
   if (!property) {
+    // Brand-new owner (zero properties) who hasn't left the wizard: send them
+    // straight into it. Loop-safe — the /setup guard only bounces BACK when
+    // dismissed, and this redirect only fires when NOT dismissed.
+    if (!isSetupDismissed()) {
+      return <Navigate to="/setup" replace />;
+    }
+    // They skipped setup earlier: offer a way back in (clearing the flag so
+    // the guard lets them through).
     return (
       <div className="empty-card">
         <img src={houseTerracotta} alt="" />
@@ -63,12 +72,17 @@ export function DashboardPage({ nowHour = new Date().getHours() }: DashboardPage
           we&apos;ll find your nearby competitors and work out your first
           price recommendation.
         </p>
-        <Link to="/setup" className="btn btn-primary">
+        <Link to="/setup" className="btn btn-primary" onClick={() => clearSetupDismissed()}>
           Start setup →
         </Link>
       </div>
     );
   }
+
+  // Resume nudge: the owner has a property but hasn't finished onboarding it
+  // (place unresolved or no room types yet). A quiet link back into the wizard
+  // closes the gap for anyone who backgrounded out mid-setup.
+  const needsSetup = property.placeStatus !== 'resolved' || property.roomTypes.length === 0;
 
   async function handleRefresh() {
     if (!property || refreshing) return;
@@ -133,6 +147,14 @@ export function DashboardPage({ nowHour = new Date().getHours() }: DashboardPage
       <p className="page-intro">
         {property.name} · {property.city} — here's what changed while you slept.
       </p>
+      {needsSetup && (
+        <p className="resume-nudge">
+          Your hotel isn&apos;t fully set up yet.{' '}
+          <Link to="/setup" onClick={() => clearSetupDismissed()}>
+            Finish setting up →
+          </Link>
+        </p>
+      )}
       {triggerJob.isError && <ErrorState error={triggerJob.error} />}
       {!busy && triggerJob.isSuccess && (
         <p className="state state-loading" role="status">

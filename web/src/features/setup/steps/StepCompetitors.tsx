@@ -1,11 +1,12 @@
 /**
  * Setup step 4: nearby competitors, auto-discovered in the background
  * (discover_competitors is chain-enqueued from resolve_place — see
- * shared/contracts/jobs.md). `useCompetitors` polls every 3s while the list
- * is empty (see `competitorsRefetchInterval` in api/hooks.ts) so this step
- * clears itself without a reload. `reDiscover` re-fires resolve-place, which
- * chain-enqueues discovery again — a lightweight retry that doesn't require
- * a dedicated endpoint.
+ * shared/contracts/jobs.md). This step opts into `useCompetitors`'s polling
+ * ({ poll: true }) so the list fills in every 3s while empty and the wizard
+ * advances itself without a reload; polling is off by default elsewhere (e.g.
+ * the Competitors page, where "zero competitors" can be a permanent state).
+ * `reDiscover` re-fires resolve-place, which chain-enqueues discovery again —
+ * a lightweight retry that doesn't require a dedicated endpoint.
  */
 
 import { useEffect, useRef } from 'react';
@@ -34,7 +35,7 @@ export function StepCompetitors({ property }: { property: Property }) {
 
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const competitors = useCompetitors(property.id);
+  const competitors = useCompetitors(property.id, { poll: true });
   const resolveProperty = useResolveProperty();
 
   const list = competitors.data ?? [];

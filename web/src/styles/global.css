@@ -1620,6 +1620,21 @@ details.place-correction-toggle summary {
   margin: var(--space-6) auto 0;
 }
 
+/* Dashboard resume nudge: quiet "finish setting up" banner for an owner who
+   backgrounded out of the wizard with an unfinished property. */
+.resume-nudge {
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius);
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
+.resume-nudge a {
+  color: var(--terracotta-ink);
+  font-weight: 700;
+}
+
 /* --- Townscape animation (login hero ONLY — data screens have no animation) --- */
 
 @keyframes ts-cloud-drift-a {

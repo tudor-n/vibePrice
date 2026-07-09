@@ -3,6 +3,7 @@ import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { SetupWizard } from './SetupWizard';
 import { SetupGuard } from './SetupGuard';
 import { StepCompetitors } from './steps/StepCompetitors';
+import { dismissSetup, isSetupDismissed } from './setupState';
 import { renderWithProviders } from '../../test/renderWithProviders';
 import type { Competitor, Property, Recommendation } from '../../api/types';
 
@@ -358,6 +359,9 @@ describe('SetupWizard — step 5: your first price', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /looks good — take me in/i }));
     expect(await screen.findByText('dashboard')).toBeInTheDocument();
+    // Finishing marks setup dismissed so the guard sends them to the dashboard
+    // from now on (not back into the wizard).
+    expect(isSetupDismissed()).toBe(true);
   });
 
   it('shows an already-generated recommendation immediately on a resumed session', async () => {
@@ -407,8 +411,23 @@ describe('SetupWizard — step 5: your first price', () => {
   });
 });
 
-describe('SetupGuard', () => {
-  it('redirects an already set-up owner (>=1 property) to the dashboard', async () => {
+describe('SetupWizard — skipping', () => {
+  it('"Skip for now" marks setup dismissed and lands on the dashboard', async () => {
+    propertyRows = [];
+    renderWithProviders(<SetupWizard />, {
+      route: '/setup',
+      path: '/setup',
+      routes: [{ path: '/', element: <p>dashboard</p> }],
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Skip for now' }));
+    expect(await screen.findByText('dashboard')).toBeInTheDocument();
+    expect(isSetupDismissed()).toBe(true);
+  });
+});
+
+describe('SetupGuard — dismissed-flag state machine (not property count)', () => {
+  it('redirects a dismissed owner to the dashboard', async () => {
+    dismissSetup();
     propertyRows = [resolvedWithRooms];
     renderWithProviders(<SetupGuard />, {
       route: '/setup',
@@ -418,7 +437,7 @@ describe('SetupGuard', () => {
     expect(await screen.findByText('dashboard')).toBeInTheDocument();
   });
 
-  it('renders the wizard for an owner with no properties yet', async () => {
+  it('renders the wizard for a not-dismissed owner with no properties yet', async () => {
     propertyRows = [];
     renderWithProviders(<SetupGuard />, {
       route: '/setup',
@@ -426,6 +445,23 @@ describe('SetupGuard', () => {
       routes: [{ path: '/', element: <p>dashboard</p> }],
     });
     expect(await screen.findByRole('heading', { name: "What's your hotel called?" })).toBeInTheDocument();
+    expect(screen.queryByText('dashboard')).not.toBeInTheDocument();
+  });
+
+  it('CRITICAL: a mid-wizard owner (1 property, not dismissed) STAYS on the wizard', async () => {
+    // Regression guard: step 1 creates a property, and the old count-based
+    // guard bounced the owner to '/' the instant a property existed — before
+    // they ever reached step 2. With the dismissed-flag machine they resume
+    // in-place (this fixture is resolved + no rooms → step 3).
+    propertyRows = [resolvedNoRooms];
+    renderWithProviders(<SetupGuard />, {
+      route: '/setup',
+      path: '/setup',
+      routes: [{ path: '/', element: <p>dashboard</p> }],
+    });
+    expect(
+      await screen.findByRole('heading', { name: 'Add your first room type' }),
+    ).toBeInTheDocument();
     expect(screen.queryByText('dashboard')).not.toBeInTheDocument();
   });
 });

@@ -9,6 +9,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useRecommendations, useTriggerJob } from '../../../api/hooks';
+import { dismissSetup } from '../setupState';
 import { AsyncStatus } from '../../../components/AsyncStatus';
 import { ErrorState } from '../../../components/States';
 import { Money } from '../../../components/Money';
@@ -133,7 +134,16 @@ export function StepFirstPrices({ property }: { property: Property }) {
               )}
             </section>
 
-            <button type="button" className="btn btn-primary" onClick={() => navigate('/')}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => {
+                // Finishing the wizard: mark setup dismissed so the guard sends
+                // the owner to the dashboard from here on, not back into /setup.
+                dismissSetup();
+                navigate('/');
+              }}
+            >
               Looks good — take me in →
             </button>
           </div>

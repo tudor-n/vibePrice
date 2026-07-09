@@ -1,8 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { DashboardPage, greetingForHour } from './DashboardPage';
+import { SetupGuard } from '../setup/SetupGuard';
+import { dismissSetup, isSetupDismissed } from '../setup/setupState';
 import { PropertyProvider } from '../../app/PropertyContext';
 import { renderWithProviders } from '../../test/renderWithProviders';
+import type { ExtraRoute } from '../../test/renderWithProviders';
 import { setSession } from '../../auth/session';
 import { fixtureRecommendation } from '../../test/fixtures';
 import type { Property, UserInfo } from '../../api/types';
@@ -98,11 +101,12 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function renderDashboard(nowHour: number) {
+function renderDashboard(nowHour: number, routes: ExtraRoute[] = []) {
   return renderWithProviders(
     <PropertyProvider>
       <DashboardPage nowHour={nowHour} />
     </PropertyProvider>,
+    { route: '/', path: '/', routes },
   );
 }
 
@@ -215,14 +219,67 @@ describe('DashboardPage', () => {
 });
 
 describe('DashboardPage — no property yet', () => {
-  it('renders a "Let\'s set up your hotel" CTA linking to /setup', async () => {
+  it('auto-redirects a brand-new (zero properties, not dismissed) owner into /setup', async () => {
     propertyRows = [];
-    renderDashboard(9);
+    renderDashboard(9, [{ path: '/setup', element: <p>setup wizard</p> }]);
+
+    expect(await screen.findByText('setup wizard')).toBeInTheDocument();
+  });
+
+  it('a dismissed, zero-property session shows the re-enter CTA and does NOT redirect', async () => {
+    propertyRows = [];
+    dismissSetup();
+    renderDashboard(9, [{ path: '/setup', element: <p>setup wizard</p> }]);
 
     expect(
       await screen.findByRole('heading', { name: "Let's set up your hotel" }),
     ).toBeInTheDocument();
+    expect(screen.queryByText('setup wizard')).not.toBeInTheDocument();
     const link = screen.getByRole('link', { name: /start setup/i });
     expect(link).toHaveAttribute('href', '/setup');
+  });
+
+  it('clicking the re-enter CTA clears the dismissed flag and heads to /setup', async () => {
+    propertyRows = [];
+    dismissSetup();
+    renderDashboard(9, [{ path: '/setup', element: <p>setup wizard</p> }]);
+
+    fireEvent.click(await screen.findByRole('link', { name: /start setup/i }));
+    expect(isSetupDismissed()).toBe(false);
+    expect(await screen.findByText('setup wizard')).toBeInTheDocument();
+  });
+});
+
+describe('DashboardPage — resume nudge (property present but setup unfinished)', () => {
+  const resolvedNoRooms: Property = { ...property, placeStatus: 'resolved', roomTypes: [] };
+
+  it('shows a "Finish setting up" link when the property has no room types yet', async () => {
+    propertyRows = [resolvedNoRooms];
+    renderDashboard(9);
+
+    const link = await screen.findByRole('link', { name: /finish setting up/i });
+    expect(link).toHaveAttribute('href', '/setup');
+  });
+
+  it('does not show the resume nudge for a fully set-up property', async () => {
+    propertyRows = [property]; // resolved + has a room type
+    renderDashboard(9);
+
+    await screen.findByRole('heading', { name: /good morning/i });
+    expect(screen.queryByRole('link', { name: /finish setting up/i })).not.toBeInTheDocument();
+  });
+});
+
+describe('DashboardPage — no redirect loop', () => {
+  it('zero-property, not-dismissed owner settles on the wizard (dashboard → /setup → wizard, terminates)', async () => {
+    // The dashboard redirects / → /setup (zero props, not dismissed); the guard
+    // renders the wizard rather than bouncing back — so this terminates at
+    // step 1 instead of ping-ponging.
+    propertyRows = [];
+    renderDashboard(9, [{ path: '/setup', element: <SetupGuard /> }]);
+
+    expect(
+      await screen.findByRole('heading', { name: "What's your hotel called?" }),
+    ).toBeInTheDocument();
   });
 });

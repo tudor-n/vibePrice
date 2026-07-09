@@ -1,37 +1,19 @@
 /**
- * Guard for the full-screen /setup destination: an owner who already has
- * >=1 property is "set up" and belongs back on the dashboard. Otherwise
- * render the wizard. (The reverse nudge — routing a no-property owner INTO
- * /setup from the dashboard — is a later task.)
+ * Guard for the full-screen /setup destination. Routing is driven by the
+ * client-side "setup dismissed" milestone (see setupState.ts), NOT by property
+ * count: step 1 creates a property, so a property-count guard would eject the
+ * owner mid-wizard (before step 2). An owner who has deliberately left the
+ * wizard ("Skip for now" / "take me in") is sent to the dashboard; everyone
+ * else sees the wizard, resumed at whatever step `useSetupProgress` derives
+ * from server state (its own loading/error states are handled there).
  */
 
 import { Navigate } from 'react-router-dom';
-import { useProperties } from '../../api/hooks';
-import { ErrorState, LoadingState } from '../../components/States';
+import { isSetupDismissed } from './setupState';
 import { SetupWizard } from './SetupWizard';
 
 export function SetupGuard() {
-  const properties = useProperties();
-
-  if (properties.isPending) {
-    return (
-      <div className="setup">
-        <div className="setup-shell">
-          <LoadingState what="your account" />
-        </div>
-      </div>
-    );
-  }
-  if (properties.isError) {
-    return (
-      <div className="setup">
-        <div className="setup-shell">
-          <ErrorState error={properties.error} />
-        </div>
-      </div>
-    );
-  }
-  if ((properties.data?.length ?? 0) > 0) {
+  if (isSetupDismissed()) {
     return <Navigate to="/" replace />;
   }
   return <SetupWizard />;

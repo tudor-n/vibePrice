@@ -93,6 +93,20 @@ function renderPage() {
   );
 }
 
+/** Count of GET requests the page made to the competitors endpoint. */
+function competitorGetCount(): number {
+  return fetchMock.mock.calls.filter(([input, init]) => {
+    const url =
+      typeof input === 'string'
+        ? input
+        : input instanceof URL
+          ? input.toString()
+          : (input as Request).url;
+    const method = (init as RequestInit | undefined)?.method ?? 'GET';
+    return method === 'GET' && url.includes('/competitors');
+  }).length;
+}
+
 describe('haversineDistanceKm', () => {
   it('returns ~0 for the same point', () => {
     expect(haversineDistanceKm(45.7983, 24.1256, 45.7983, 24.1256)).toBeCloseTo(0, 5);
@@ -126,6 +140,20 @@ describe('CompetitorsPage — states', () => {
     competitorRows = [];
     renderPage();
     expect(await screen.findByText(/No competitors discovered yet/)).toBeInTheDocument();
+  });
+
+  it('does NOT poll competitors by default — a permanently-empty list is not refetched on an interval', async () => {
+    // Regression guard for the Important review finding: useCompetitors polling
+    // is opt-in ({ poll: true } only in the setup wizard). The Competitors page
+    // uses the default, so an empty list must not trigger an endless 3s refetch.
+    competitorRows = [];
+    renderPage();
+    await screen.findByText(/No competitors discovered yet/);
+    const countAfterMount = competitorGetCount();
+
+    // Wait past one 3s poll interval; with polling off the count stays put.
+    await new Promise((resolve) => setTimeout(resolve, 3500));
+    expect(competitorGetCount()).toBe(countAfterMount);
   });
 });
 

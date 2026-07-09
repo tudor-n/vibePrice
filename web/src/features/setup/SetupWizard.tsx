@@ -7,6 +7,7 @@
 
 import { useNavigate } from 'react-router-dom';
 import { useSetupProgress } from './useSetupProgress';
+import { dismissSetup } from './setupState';
 import { StepName } from './steps/StepName';
 import { StepConfirmPlace } from './steps/StepConfirmPlace';
 import { StepRoom } from './steps/StepRoom';
@@ -64,7 +65,17 @@ export function SetupWizard() {
       <div className="setup-shell">
         <ProgressDots current={currentDot} />
         {content}
-        <button type="button" className="btn btn-ghost setup-skip" onClick={() => navigate('/')}>
+        <button
+          type="button"
+          className="btn btn-ghost setup-skip"
+          onClick={() => {
+            // "Skip for now" is the owner deliberately leaving the wizard —
+            // record the milestone so the guard/dashboard stop routing them
+            // back in (they can re-enter from the dashboard nudge).
+            dismissSetup();
+            navigate('/');
+          }}
+        >
           Skip for now
         </button>
       </div>
