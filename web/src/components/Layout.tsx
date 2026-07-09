@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import type { ComponentType } from 'react';
 import { clearSession, getActiveSession } from '../auth/session';
 import { useSelectedProperty, usePropertySelection } from '../app/PropertyContext';
+import { clearSetupDismissed } from '../app/setupState';
 import {
   IconCompetitors,
   IconDashboard,
@@ -64,6 +65,10 @@ export function Layout() {
 
   function handleLogout() {
     clearSession();
+    // A different owner may sign in next on this browser: clear this owner's
+    // local "setup dismissed" milestone so a brand-new (zero-property) owner
+    // is auto-routed into /setup instead of seeing the stale CTA card.
+    clearSetupDismissed();
     // Drop everything cached for this user before the next sign-in.
     queryClient.clear();
     navigate('/login', { replace: true });

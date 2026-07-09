@@ -103,11 +103,13 @@ export function LoginPage() {
 
           {import.meta.env.DEV && (
             <aside className="login-hint">
-              <strong>Demo account (dev only):</strong>
+              <strong>Demo accounts (dev only):</strong>
               <br />
-              Email: <code>demo@pricepilot.local</code>
+              Existing owner: <code>demo@pricepilot.local</code>
               <br />
-              Password: <code>Demo1234!</code>
+              Brand-new owner (onboarding): <code>new@pricepilot.local</code>
+              <br />
+              Password (both): <code>Demo1234!</code>
             </aside>
           )}
         </section>

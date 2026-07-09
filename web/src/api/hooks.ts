@@ -5,6 +5,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch, login } from './client';
+import { clearSetupDismissed } from '../app/setupState';
 import type {
   Competitor,
   EventItem,
@@ -25,7 +26,11 @@ export function useLogin() {
   return useMutation({
     mutationFn: ({ email, password }: LoginRequest) => login(email, password),
     onSuccess: () => {
-      // A new identity invalidates everything cached for the previous one.
+      // A new identity: clear the previous owner's local "setup dismissed"
+      // milestone (a zero-property returner should be re-prompted into
+      // onboarding; a with-property owner is never redirected anyway) and
+      // invalidate everything cached for the previous one.
+      clearSetupDismissed();
       void queryClient.invalidateQueries();
     },
   });
