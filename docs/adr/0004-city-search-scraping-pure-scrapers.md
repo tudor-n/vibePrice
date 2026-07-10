@@ -41,3 +41,16 @@ so the testable surface must be maximal and the I/O surface minimal.
   for v1 (competitor position is a band, not a per-room comparison).
 - Airbnb search is client-rendered; it stays registered-but-unimplemented until a
   browser-based fetcher (or API) is added behind the same pure interface.
+
+## Amendment — 2026-07-10
+
+`scrape_max_pages` (config, default 2) permits bounded adaptive escalation beyond the
+original one-request-per-stay-date baseline: per date, the orchestrator fetches
+additional city-search result pages only while at least one in-scope competitor is
+still unmatched, stopping early the moment every competitor is matched (so the common
+case stays one request). `scrape_max_pages=1` reproduces the original strict
+one-request-per-date behavior exactly. This improves competitor coverage for cities
+where a single search page doesn't surface every listing. See
+`docs/superpowers/specs/2026-07-10-competitor-booking-linking-design.md` for the design
+this shipped under; the core decision above (city-search over per-property pages, pure
+scrapers, one polite client) is unchanged.

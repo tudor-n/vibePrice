@@ -89,6 +89,7 @@ def main(
                     stay_dates=stay_dates,
                     sources=sources,
                     currency=settings.scrape_currency,
+                    max_pages=settings.scrape_max_pages,
                 )
                 print(f"{city}: {result}")
                 continue
@@ -109,6 +110,7 @@ def main(
                     competitors=competitors,
                     stay_dates=stay_dates,
                     expected_currency=settings.scrape_currency,
+                    max_pages=settings.scrape_max_pages,
                 )
                 name_by_id = {c.id: c.name for c in competitors}
                 print(

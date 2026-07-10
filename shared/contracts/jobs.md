@@ -41,7 +41,10 @@ Rules:
 
 ## Result shapes (job `result` JSONB)
 
-`scrape.competitor_rates` (ADR 0004 — one city-search request per stay date per source):
+`scrape.competitor_rates` (ADR 0004 — city-search per stay date per source; adaptively
+fetches up to `scrape_max_pages` result pages per date, stopping early once every
+in-scope competitor is matched — default 2, `scrape_max_pages=1` is the strict
+one-request-per-date baseline):
 
 ```json
 {
