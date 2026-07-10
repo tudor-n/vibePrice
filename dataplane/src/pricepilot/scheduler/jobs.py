@@ -638,6 +638,7 @@ def handle_discover_competitors(
             capped, settings.competitor_discovery_max, prop.id,
         )
     session.commit()
+    enqueue_job(session, "link_competitor_sources", {"property_id": str(prop.id)})
     return {
         "property_id": str(prop.id), "discovered": discovered,
         "skipped_excluded": skipped_excluded, "capped": capped,

@@ -3,9 +3,9 @@
 * Waits for the database with retry + log so ``docker compose up`` ordering
   never crashes it.
 * If ``SCHEDULER_ENABLED``: APScheduler enqueues the recurring jobs (ingest
-  02:00, scrape 04:00, engine 05:00 UTC) into the jobs table — observability
-  via the same dispatch path the backend uses — rather than running work
-  directly.
+  02:00, link 03:45, scrape 04:00, engine 05:00 UTC) into the jobs table —
+  observability via the same dispatch path the backend uses — rather than
+  running work directly.
 * Polls the jobs table every 5 seconds, claiming and executing one job at a
   time. Ctrl+C / SIGINT shuts down gracefully.
 """
@@ -62,6 +62,10 @@ def enqueue_nightly_ingest() -> None:
     _enqueue("ingest.demand_signals", {"city": DEFAULT_CITY})
 
 
+def enqueue_nightly_link() -> None:
+    _enqueue("link_competitor_sources", {"property_id": None})
+
+
 def enqueue_nightly_scrape() -> None:
     _enqueue("scrape.competitor_rates", {"city": DEFAULT_CITY, "property_id": None})
 
@@ -76,6 +80,7 @@ def enqueue_nightly_engine() -> None:
 def build_scheduler() -> BackgroundScheduler:
     scheduler = BackgroundScheduler(timezone="UTC")
     scheduler.add_job(enqueue_nightly_ingest, CronTrigger(hour=2, minute=0), name="ingest")
+    scheduler.add_job(enqueue_nightly_link, CronTrigger(hour=3, minute=45), name="link")
     scheduler.add_job(enqueue_nightly_scrape, CronTrigger(hour=4, minute=0), name="scrape")
     scheduler.add_job(enqueue_nightly_engine, CronTrigger(hour=5, minute=0), name="engine")
     return scheduler
@@ -126,7 +131,9 @@ def run() -> None:
     if settings.scheduler_enabled:
         scheduler = build_scheduler()
         scheduler.start()
-        logger.info("APScheduler started: ingest 02:00, scrape 04:00, engine 05:00 (UTC)")
+        logger.info(
+            "APScheduler started: ingest 02:00, link 03:45, scrape 04:00, engine 05:00 (UTC)"
+        )
 
     try:
         while True:

@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from pricepilot.scheduler.main import build_scheduler
 from pricepilot.scrapers import SCRAPERS
 from pricepilot.scrapers.airbnb import AirbnbScraper
 from pricepilot.scrapers.base import ListingRate
@@ -171,3 +172,8 @@ def test_airbnb_is_explicitly_unimplemented() -> None:
         scraper.plan_request("sibiu", date(2026, 8, 7))
     with pytest.raises(NotImplementedError):
         scraper.parse_listings("<html></html>")
+
+
+def test_scheduler_registers_link_sweep() -> None:
+    names = {job.name for job in build_scheduler().get_jobs()}
+    assert "link" in names
