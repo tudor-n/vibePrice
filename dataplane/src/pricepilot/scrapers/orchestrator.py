@@ -43,18 +43,18 @@ def competitors_by_city(
     ``property_id`` wins over ``city``; both ``None`` means every property
     (the system-wide nightly job — jobs.md: nulls mean "all").
     """
-    query = select(Competitor.id, Competitor.name, Property.city).join(
-        Property, Competitor.property_id == Property.id
-    )
+    query = select(
+        Competitor.id, Competitor.name, Competitor.source_url, Property.city
+    ).join(Property, Competitor.property_id == Property.id)
     if property_id is not None:
         query = query.where(Competitor.property_id == property_id)
     elif city is not None:
         query = query.where(func.lower(Property.city) == city.strip().lower())
 
     grouped: dict[str, list[CompetitorRef]] = {}
-    for competitor_id, name, property_city in session.execute(query):
+    for competitor_id, name, source_url, property_city in session.execute(query):
         grouped.setdefault(property_city, []).append(
-            CompetitorRef(id=competitor_id, name=name)
+            CompetitorRef(id=competitor_id, name=name, source_url=source_url)
         )
     return grouped
 
@@ -116,7 +116,9 @@ def collect_source_observations(
 
         outcome.dates_fetched += 1
         listings = scraper.parse_listings(html)
-        for competitor_id, listing in match_listings(listings, competitors, city).items():
+        for competitor_id, listing in match_listings(
+            listings, competitors, city, identity_of=scraper.identity_of
+        ).items():
             # Name matching succeeded either way; currency decides persistence.
             matched_ever.add(competitor_id)
             if listing.currency != expected_currency:

@@ -4,6 +4,7 @@ from decimal import Decimal
 from uuid import uuid4
 
 from pricepilot.scrapers.base import ListingRate
+from pricepilot.scrapers.booking import booking_slug
 from pricepilot.scrapers.matching import (
     CompetitorRef,
     match_listings,
@@ -90,3 +91,38 @@ def test_one_listing_may_serve_multiple_competitor_rows() -> None:
     matched = match_listings([listing("Casa Luxemburg")], [first, second], city="sibiu")
     assert matched[first.id].name == "Casa Luxemburg"
     assert matched[second.id].name == "Casa Luxemburg"
+
+
+def _listing(name, slug):
+    url = f"https://www.booking.com/hotel/ro/{slug}.html" if slug else None
+    return ListingRate(name=name, price=Decimal("400"), currency="RON", url=url)
+
+
+def test_linked_competitor_matches_by_slug_despite_name_mismatch():
+    listings = [_listing("Ramada by Wyndham Sibiu", "ramada-sibiu")]
+    competitor = CompetitorRef(
+        id=uuid4(),
+        name="Totally Different Name",
+        source_url="https://www.booking.com/hotel/ro/ramada-sibiu.en-gb.html",
+    )
+    matched = match_listings(listings, [competitor], "sibiu", identity_of=booking_slug)
+    assert matched[competitor.id].name == "Ramada by Wyndham Sibiu"
+
+
+def test_linked_competitor_does_not_fall_back_to_name():
+    # Linked to a slug absent from the page; a same-name listing must NOT match.
+    listings = [_listing("Hotel Ramada Sibiu", "some-other-hotel")]
+    competitor = CompetitorRef(
+        id=uuid4(),
+        name="Hotel Ramada Sibiu",
+        source_url="https://www.booking.com/hotel/ro/ramada-sibiu.html",
+    )
+    matched = match_listings(listings, [competitor], "sibiu", identity_of=booking_slug)
+    assert competitor.id not in matched
+
+
+def test_unlinked_competitor_falls_back_to_name():
+    listings = [_listing("Hotel Ramada Sibiu", "ramada-sibiu")]
+    competitor = CompetitorRef(id=uuid4(), name="Ramada")
+    matched = match_listings(listings, [competitor], "sibiu", identity_of=booking_slug)
+    assert matched[competitor.id].name == "Hotel Ramada Sibiu"
