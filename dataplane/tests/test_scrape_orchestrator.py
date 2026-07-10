@@ -7,6 +7,7 @@ from uuid import uuid4
 
 import pytest
 
+from pricepilot.scrapers.base import ListingRate, PlannedRequest, SearchScraper
 from pricepilot.scrapers.booking import BookingScraper
 from pricepilot.scrapers.client import ScraperBlockedError, ScraperFetchError
 from pricepilot.scrapers.matching import CompetitorRef
@@ -125,3 +126,60 @@ def test_currency_mismatch_drops_observation_with_issue(search_html):
     assert any("currency mismatch" in issue for issue in outcome.issues)
     # Name matching itself worked — not an unmatched-name problem.
     assert outcome.unmatched == []
+
+
+class TwoPageScraper(SearchScraper):
+    """Page 0 lists hotel A only; page 1 adds hotel B. Records pages fetched."""
+
+    name = "twopage"
+
+    def __init__(self, currency="RON"):
+        super().__init__(currency=currency)
+        self.pages_requested = []
+
+    def plan_request(self, city, stay_date, *, page=0):
+        self.pages_requested.append(page)
+        return PlannedRequest(url=f"http://test/{page}", stay_date=stay_date)
+
+    def parse_listings(self, html):
+        page = html.rsplit("/", 1)[-1]
+        if page == "0":
+            return [ListingRate("Hotel A", Decimal("300"), "RON", "http://x/hotel/ro/a.html")]
+        return [ListingRate("Hotel B", Decimal("400"), "RON", "http://x/hotel/ro/b.html")]
+
+    def identity_of(self, url):
+        from pricepilot.scrapers.booking import booking_slug
+        return booking_slug(url)
+
+
+class DictClient:
+    def __init__(self, pages):
+        self.pages = pages
+
+    def get(self, url):
+        return url  # scraper.parse_listings keys off the trailing page number
+
+
+def test_pagination_stops_early_when_all_matched():
+    scraper = TwoPageScraper()
+    competitors = [CompetitorRef(id=uuid4(), name="Hotel A")]
+    outcome = collect_source_observations(
+        scraper, DictClient({}), city="sibiu", competitors=competitors,
+        stay_dates=[date(2026, 7, 10)], expected_currency="RON", max_pages=3,
+    )
+    assert scraper.pages_requested == [0]  # matched on page 0, no further paging
+    assert len(outcome.observations) == 1
+
+
+def test_pagination_escalates_until_match():
+    scraper = TwoPageScraper()
+    competitors = [
+        CompetitorRef(id=uuid4(), name="Hotel A"),
+        CompetitorRef(id=uuid4(), name="Hotel B"),
+    ]
+    outcome = collect_source_observations(
+        scraper, DictClient({}), city="sibiu", competitors=competitors,
+        stay_dates=[date(2026, 7, 10)], expected_currency="RON", max_pages=3,
+    )
+    assert scraper.pages_requested == [0, 1]  # needed page 1 to find Hotel B
+    assert len(outcome.observations) == 2

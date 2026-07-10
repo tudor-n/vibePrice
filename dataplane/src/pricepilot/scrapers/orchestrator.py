@@ -85,41 +85,60 @@ def collect_source_observations(
     competitors: Sequence[CompetitorRef],
     stay_dates: Sequence[date],
     expected_currency: str,
+    max_pages: int = 1,
 ) -> SourceOutcome:
     """Fetch/parse/match the whole window for one source. No DB access.
 
-    A block aborts the remaining dates (hammering a refusing site is both
-    impolite and useless); transient failures skip only their date. Matched
-    observations in a different currency than requested are dropped with an
-    issue note — money in the wrong currency must never reach the engine.
+    Per stay date, fetch result pages only until every in-scope competitor is
+    matched or ``max_pages`` is reached (adaptive: usually one request). A block
+    aborts the remaining dates; a transient failure skips only its date. Matched
+    observations in a different currency than requested are dropped with a note.
     """
     outcome = SourceOutcome()
     matched_ever: set[Any] = set()
     currency_mismatch_dates: dict[tuple[str, str], int] = {}
 
     for index, stay_date in enumerate(stay_dates):
-        plan = scraper.plan_request(city, stay_date)
-        try:
-            html = client.get(plan.url)
-        except ScraperBlockedError as exc:
-            remaining = len(stay_dates) - index
+        listings: list[Any] = []
+        matches: dict[Any, Any] = {}
+        fetched = False
+        block_issue: str | None = None
+
+        for page in range(max_pages):
+            plan = scraper.plan_request(city, stay_date, page=page)
+            try:
+                html = client.get(plan.url)
+            except ScraperBlockedError as exc:
+                remaining = len(stay_dates) - index
+                block_issue = (
+                    f"{stay_date}: blocked ({exc}); aborted the remaining {remaining - 1} dates"
+                )
+                break
+            except ScraperFetchError as exc:
+                if page == 0:
+                    outcome.dates_failed += 1
+                    outcome.issues.append(f"{stay_date}: {exc}")
+                else:
+                    outcome.issues.append(f"{stay_date} page {page + 1}: {exc}")
+                break
+
+            fetched = True
+            listings.extend(scraper.parse_listings(html))
+            matches = match_listings(listings, competitors, city, identity_of=scraper.identity_of)
+            if len(matches) >= len(competitors):
+                break  # everyone found; stop paging
+
+        if block_issue is not None:
             outcome.blocked = True
-            outcome.dates_failed += remaining
-            outcome.issues.append(
-                f"{stay_date}: blocked ({exc}); aborted the remaining {remaining - 1} dates"
-            )
+            outcome.dates_failed += len(stay_dates) - index
+            outcome.issues.append(block_issue)
             break
-        except ScraperFetchError as exc:
-            outcome.dates_failed += 1
-            outcome.issues.append(f"{stay_date}: {exc}")
+
+        if not fetched:
             continue
 
         outcome.dates_fetched += 1
-        listings = scraper.parse_listings(html)
-        for competitor_id, listing in match_listings(
-            listings, competitors, city, identity_of=scraper.identity_of
-        ).items():
-            # Name matching succeeded either way; currency decides persistence.
+        for competitor_id, listing in matches.items():
             matched_ever.add(competitor_id)
             if listing.currency != expected_currency:
                 key = (listing.name, listing.currency)
@@ -160,6 +179,7 @@ def scrape_city(
     stay_dates: Sequence[date],
     sources: Sequence[str],
     currency: str,
+    max_pages: int = 1,
 ) -> dict[str, Any]:
     """Run every enabled source for one city; persist rates + run bookkeeping."""
     source_reports: dict[str, Any] = {}
@@ -187,6 +207,7 @@ def scrape_city(
             competitors=competitors,
             stay_dates=stay_dates,
             expected_currency=currency,
+            max_pages=max_pages,
         )
 
         if outcome.observations:

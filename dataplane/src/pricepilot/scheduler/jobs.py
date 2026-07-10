@@ -162,6 +162,7 @@ def handle_scrape_competitor_rates(
                 stay_dates=stay_dates,
                 sources=sources,
                 currency=currency,
+                max_pages=settings.scrape_max_pages,
             )
             cities[city] = city_result
             total_written += city_result["rates_written"]

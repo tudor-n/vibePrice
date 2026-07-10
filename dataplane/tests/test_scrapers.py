@@ -35,6 +35,11 @@ def test_build_search_url_honors_currency() -> None:
     assert "selected_currency=EUR" in url
 
 
+def test_build_search_url_omits_offset_on_first_page() -> None:
+    url = build_search_url("sibiu", date(2026, 7, 10))
+    assert "offset" not in url
+
+
 @pytest.mark.parametrize(
     ("text", "expected"),
     [
@@ -157,6 +162,12 @@ def test_plan_request_builds_search_url_with_instance_currency() -> None:
     assert plan.stay_date == date(2026, 8, 7)
     assert "selected_currency=EUR" in plan.url
     assert "checkin=2026-08-07" in plan.url
+
+
+def test_plan_request_page_maps_to_offset() -> None:
+    scraper = BookingScraper(currency="RON")
+    url = scraper.plan_request("sibiu", date(2026, 7, 10), page=2).url
+    assert "offset=50" in url  # page 2 * 25 per page
 
 
 def test_registry_contains_isolated_sources() -> None:

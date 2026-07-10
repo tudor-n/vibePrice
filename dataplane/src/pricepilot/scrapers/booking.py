@@ -58,7 +58,9 @@ def booking_slug(url: str | None) -> str | None:
     return f"{country}/{slug}"
 
 
-def build_search_url(city: str, stay_date: date, *, currency: str = "RON") -> str:
+def build_search_url(
+    city: str, stay_date: date, *, currency: str = "RON", offset: int = 0
+) -> str:
     """Search-results URL for one night (checkin=stay date, checkout=+1)."""
     params = {
         "ss": city,
@@ -70,6 +72,8 @@ def build_search_url(city: str, stay_date: date, *, currency: str = "RON") -> st
         "selected_currency": currency,
         "lang": "en-us",
     }
+    if offset:
+        params["offset"] = offset
     return f"{BOOKING_SEARCH_URL}?{urlencode(params)}"
 
 
@@ -147,9 +151,11 @@ def parse_listings(html: str) -> list[ListingRate]:
 class BookingScraper(SearchScraper):
     name = "booking"
 
-    def plan_request(self, city: str, stay_date: date) -> PlannedRequest:
+    def plan_request(self, city: str, stay_date: date, *, page: int = 0) -> PlannedRequest:
         return PlannedRequest(
-            url=build_search_url(city, stay_date, currency=self.currency),
+            url=build_search_url(
+                city, stay_date, currency=self.currency, offset=page * _PAGE_SIZE
+            ),
             stay_date=stay_date,
         )
 
