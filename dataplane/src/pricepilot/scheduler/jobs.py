@@ -38,7 +38,10 @@ from pricepilot.ingest.holidays import holiday_signal_records
 from pricepilot.ingest.signals import upsert_signals
 from pricepilot.ingest.weather import CITY_COORDS, fetch_weather_signals
 from pricepilot.places import PlaceCandidate, get_places_provider
-from pricepilot.scrapers.client import PoliteClient
+from pricepilot.scrapers.booking import BookingScraper
+from pricepilot.scrapers.client import PoliteClient, ScraperBlockedError, ScraperFetchError
+from pricepilot.scrapers.linker import resolve_competitor_link
+from pricepilot.scrapers.matching import CompetitorRef
 from pricepilot.scrapers.orchestrator import SupportsGet, competitors_by_city, scrape_city
 
 logger = logging.getLogger(__name__)
@@ -159,6 +162,7 @@ def handle_scrape_competitor_rates(
                 stay_dates=stay_dates,
                 sources=sources,
                 currency=currency,
+                max_pages=settings.scrape_max_pages,
             )
             cities[city] = city_result
             total_written += city_result["rates_written"]
@@ -635,9 +639,87 @@ def handle_discover_competitors(
             capped, settings.competitor_discovery_max, prop.id,
         )
     session.commit()
+    enqueue_job(session, "link_competitor_sources", {"property_id": str(prop.id)})
     return {
         "property_id": str(prop.id), "discovered": discovered,
         "skipped_excluded": skipped_excluded, "capped": capped,
+    }
+
+
+#: Link searches use a near-future date only to form a valid Booking URL; the
+#: card link (not its price) is what we read, so the exact date is irrelevant.
+LINK_SEARCH_LEAD_DAYS = 30
+
+
+def _competitors_needing_links(session: Session, *, property_id: UUID | None):
+    """Rows (id, name, city) for competitors with no link yet, honoring tombstones."""
+    query = (
+        select(Competitor.id, Competitor.name, Property.city)
+        .join(Property, Competitor.property_id == Property.id)
+        .where(Competitor.source_url.is_(None), Competitor.excluded_at.is_(None))
+    )
+    if property_id is not None:
+        query = query.where(Competitor.property_id == property_id)
+    return list(session.execute(query))
+
+
+def handle_link_competitor_sources(
+    session: Session,
+    payload: dict[str, Any],
+    *,
+    client: Any = None,
+) -> dict[str, Any]:
+    """Resolve each unlinked competitor to its Booking listing URL (idempotent).
+
+    Scope: ``property_id`` (one property) or null (a sweep over all). Only rows
+    with ``source_url IS NULL`` and no ``excluded_at`` are touched, so an
+    existing/corrected link is never clobbered and re-runs are safe. A Booking
+    block aborts the remaining competitors and is reported. ``client`` is
+    injectable for tests; production builds a PoliteClient.
+    """
+    settings = get_settings()
+    property_id = _parse_uuid(payload.get("property_id"))
+    rows = _competitors_needing_links(session, property_id=property_id)
+    if not rows:
+        return {"linked": 0, "unlinked": 0, "note": "no competitors need linking"}
+
+    scraper = BookingScraper(currency=settings.scrape_currency)
+    link_date = date.today() + timedelta(days=LINK_SEARCH_LEAD_DAYS)
+    owns_client = client is None
+    active_client = client if client is not None else PoliteClient()
+    linked = unlinked = 0
+    blocked = False
+    try:
+        for competitor_id, name, city in rows:
+            plan = scraper.plan_request(f"{name}, {city}", link_date)
+            try:
+                html = active_client.get(plan.url)
+            except ScraperBlockedError:
+                blocked = True
+                break
+            except ScraperFetchError:
+                unlinked += 1
+                continue
+            cards = scraper.parse_listings(html)[: settings.competitor_link_max_results]
+            ref = CompetitorRef(id=competitor_id, name=name, source_url=None)
+            url = resolve_competitor_link(cards, ref, city, identity_of=scraper.identity_of)
+            if url is None:
+                unlinked += 1
+                continue
+            session.execute(
+                update(Competitor).where(Competitor.id == competitor_id).values(source_url=url)
+            )
+            linked += 1
+        session.commit()
+    finally:
+        if owns_client:
+            active_client.close()
+
+    return {
+        "property_id": str(property_id) if property_id is not None else None,
+        "linked": linked,
+        "unlinked": unlinked,
+        "blocked": blocked,
     }
 
 
@@ -650,4 +732,5 @@ HANDLERS: dict[str, Handler] = {
     "engine.generate_recommendations": handle_generate_recommendations,
     "resolve_place": handle_resolve_place,
     "discover_competitors": handle_discover_competitors,
+    "link_competitor_sources": handle_link_competitor_sources,
 }

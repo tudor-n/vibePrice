@@ -34,6 +34,7 @@ class ListingRate:
     name: str
     price: Decimal
     currency: str
+    url: str | None = None
 
 
 @dataclass(frozen=True)
@@ -62,9 +63,13 @@ class SearchScraper(ABC):
         self.currency = currency
 
     @abstractmethod
-    def plan_request(self, city: str, stay_date: date) -> PlannedRequest:
-        """Build the search-results request for one city and stay date."""
+    def plan_request(self, city: str, stay_date: date, *, page: int = 0) -> PlannedRequest:
+        """Build the search-results request for one city, stay date, and result page."""
 
     @abstractmethod
     def parse_listings(self, html: str) -> list[ListingRate]:
-        """Extract (name, price, currency) listings from a search-results page."""
+        """Extract listings from a search-results page."""
+
+    def identity_of(self, url: str | None) -> str | None:
+        """Stable listing identity for slug-matching; None when the source has none."""
+        return None

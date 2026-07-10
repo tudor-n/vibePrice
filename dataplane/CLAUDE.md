@@ -115,9 +115,12 @@ fixture stand-in with the contract's fixed UUIDs.
   `parse_listings(html)`. ALL network I/O lives in `scrapers/client.py`
   (`PoliteClient`: jittered delay, bounded retries, blocked-detection);
   matching + persistence live in `scrapers/orchestrator.py`.
-- Strategy: one city-search request per stay date covers every competitor in
-  town; listings are matched to competitors by significant-token name
-  matching (`scrapers/matching.py`) — unmatched names are surfaced per run.
+- Strategy: adaptive city-search pagination — one request per stay date in the
+  common case, escalating up to `scrape_max_pages` (config, default 2) result
+  pages only while unmatched competitors remain, stopping early once every
+  in-scope competitor is matched; listings are matched to competitors by
+  significant-token name matching (`scrapers/matching.py`) — unmatched names
+  are surfaced per run.
 - Tests use saved HTML fixtures in `tests/fixtures/` **only** — never live
   sites (repo hard rule). Inject fakes for the client; `PoliteClient` itself
   is tested via `httpx.MockTransport`.

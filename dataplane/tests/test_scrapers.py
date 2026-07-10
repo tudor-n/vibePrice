@@ -6,11 +6,13 @@ from pathlib import Path
 
 import pytest
 
+from pricepilot.scheduler.main import build_scheduler
 from pricepilot.scrapers import SCRAPERS
 from pricepilot.scrapers.airbnb import AirbnbScraper
 from pricepilot.scrapers.base import ListingRate
 from pricepilot.scrapers.booking import (
     BookingScraper,
+    booking_slug,
     build_search_url,
     detect_currency,
     parse_listings,
@@ -31,6 +33,11 @@ def test_build_search_url_exact() -> None:
 def test_build_search_url_honors_currency() -> None:
     url = build_search_url("sibiu", date(2026, 8, 7), currency="EUR")
     assert "selected_currency=EUR" in url
+
+
+def test_build_search_url_omits_offset_on_first_page() -> None:
+    url = build_search_url("sibiu", date(2026, 7, 10))
+    assert "offset" not in url
 
 
 @pytest.mark.parametrize(
@@ -76,15 +83,36 @@ def test_parse_listings_from_search_fixture(fixtures_dir: Path) -> None:
     listings = parse_listings(html)
 
     assert listings == [
-        ListingRate(name="Ramada by Wyndham Sibiu", price=Decimal("412"), currency="RON"),
         ListingRate(
-            name="Hotel Împăratul Romanilor", price=Decimal("389"), currency="RON"
+            name="Ramada by Wyndham Sibiu",
+            price=Decimal("412"),
+            currency="RON",
+            url="https://www.booking.com/hotel/ro/ramada-sibiu.html",
         ),
-        ListingRate(name="Casa Luxemburg", price=Decimal("1234"), currency="RON"),
         ListingRate(
-            name="Pensiunea Cetate Veche", price=Decimal("435.50"), currency="RON"
+            name="Hotel Împăratul Romanilor",
+            price=Decimal("389"),
+            currency="RON",
+            url="https://www.booking.com/hotel/ro/imparatul-romanilor.en-gb.html",
         ),
-        ListingRate(name="Golden Tulip Ana Tower", price=Decimal("95"), currency="EUR"),
+        ListingRate(
+            name="Casa Luxemburg",
+            price=Decimal("1234"),
+            currency="RON",
+            url="https://www.booking.com/hotel/ro/casa-luxemburg-sibiu.html",
+        ),
+        ListingRate(
+            name="Pensiunea Cetate Veche",
+            price=Decimal("435.50"),
+            currency="RON",
+            url="https://www.booking.com/hotel/ro/pensiunea-cetate-veche.html",
+        ),
+        ListingRate(
+            name="Golden Tulip Ana Tower",
+            price=Decimal("95"),
+            currency="EUR",
+            url="https://www.booking.com/hotel/ro/golden-tulip-ana-tower-sibiu.html",
+        ),
     ]
     for listing in listings:
         assert isinstance(listing.price, Decimal)
@@ -106,11 +134,40 @@ def test_taxes_line_is_not_mistaken_for_the_price(fixtures_dir: Path) -> None:
     assert ramada.price == Decimal("412")  # not the "+RON 62 taxes" line
 
 
+def test_booking_slug_extracts_country_and_slug() -> None:
+    assert booking_slug("https://www.booking.com/hotel/ro/ramada-sibiu.html") == "ro/ramada-sibiu"
+
+
+def test_booking_slug_ignores_locale_and_query() -> None:
+    url = "https://www.booking.com/hotel/ro/imparatul-romanilor.en-gb.html?checkin=2026-07-10"
+    assert booking_slug(url) == "ro/imparatul-romanilor"
+
+
+def test_booking_slug_none_for_non_hotel_or_empty() -> None:
+    assert booking_slug("https://www.booking.com/searchresults.html") is None
+    assert booking_slug(None) is None
+    assert booking_slug("") is None
+
+
+def test_parse_listings_extracts_hotel_url(fixtures_dir: Path) -> None:
+    html = (fixtures_dir / "booking_search_sibiu.html").read_text(encoding="utf-8")
+    by_name = {listing.name: listing for listing in parse_listings(html)}
+    ramada = by_name["Ramada by Wyndham Sibiu"]
+    assert ramada.url == "https://www.booking.com/hotel/ro/ramada-sibiu.html"
+    assert booking_slug(ramada.url) == "ro/ramada-sibiu"
+
+
 def test_plan_request_builds_search_url_with_instance_currency() -> None:
     plan = BookingScraper(currency="EUR").plan_request("sibiu", date(2026, 8, 7))
     assert plan.stay_date == date(2026, 8, 7)
     assert "selected_currency=EUR" in plan.url
     assert "checkin=2026-08-07" in plan.url
+
+
+def test_plan_request_page_maps_to_offset() -> None:
+    scraper = BookingScraper(currency="RON")
+    url = scraper.plan_request("sibiu", date(2026, 7, 10), page=2).url
+    assert "offset=50" in url  # page 2 * 25 per page
 
 
 def test_registry_contains_isolated_sources() -> None:
@@ -126,3 +183,8 @@ def test_airbnb_is_explicitly_unimplemented() -> None:
         scraper.plan_request("sibiu", date(2026, 8, 7))
     with pytest.raises(NotImplementedError):
         scraper.parse_listings("<html></html>")
+
+
+def test_scheduler_registers_link_sweep() -> None:
+    names = {job.name for job in build_scheduler().get_jobs()}
+    assert "link" in names

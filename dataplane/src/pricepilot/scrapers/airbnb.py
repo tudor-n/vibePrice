@@ -21,7 +21,7 @@ class AirbnbScraper(SearchScraper):
     name = "airbnb"
     implemented: ClassVar[bool] = False
 
-    def plan_request(self, city: str, stay_date: date) -> PlannedRequest:
+    def plan_request(self, city: str, stay_date: date, *, page: int = 0) -> PlannedRequest:
         raise NotImplementedError(_NOT_IMPLEMENTED)
 
     def parse_listings(self, html: str) -> list[ListingRate]:

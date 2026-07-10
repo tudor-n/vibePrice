@@ -313,7 +313,8 @@ def test_discover_upserts_and_skips_self_and_tombstoned():
     assert params["id"] == uuid.uuid5(DISCOVERY_NS, "ChIJ_a")
     assert params["tenant_id"] == prop.tenant_id
     assert params["name"] == "Hotel A"
-    assert session.commits == 1
+    # discover's own commit + the chained link_competitor_sources enqueue
+    assert session.commits == 2
 
     # never re-added the self place or the tombstoned place
     inserted_place_ids = {_competitor_insert_params(s)["place_id"] for s in competitor_inserts}
@@ -390,3 +391,28 @@ def test_discover_existing_known_place_updates_not_new_and_keeps_uuid5_key():
     params = _competitor_insert_params(competitor_inserts[0])
     assert params["id"] == known_id == uuid.uuid5(DISCOVERY_NS, "ChIJ_a")
     assert params["name"] == "Hotel A"  # refreshed from the fresh candidate
+
+
+def test_discover_enqueues_link_job():
+    prop = make_property(name="Hotel X", city="sibiu")
+    prop.place_id = "ChIJ_self"
+    prop.latitude = Decimal("45.79")
+    prop.longitude = Decimal("24.15")
+    session = FakeSession(prop, existing_competitors=[])
+    provider = FakeNearby(
+        [
+            PlaceCandidate(
+                "ChIJ_a", "Nearby Inn", None, Decimal("45.80"), Decimal("24.16"),
+                Decimal("4.2"), 120,
+            )
+        ]
+    )
+
+    handle_discover_competitors(session, {"property_id": str(prop.id)}, provider=provider)
+
+    link_jobs = [
+        i for i in _inserts_of(session, "jobs")
+        if i.compile().params["type"] == "link_competitor_sources"
+    ]
+    assert len(link_jobs) == 1
+    assert link_jobs[0].compile().params["payload"] == {"property_id": str(prop.id)}

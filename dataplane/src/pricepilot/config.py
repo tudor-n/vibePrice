@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     google_places_api_key: str = ""
     competitor_discovery_radius_m: int = 1500
     competitor_discovery_max: int = 15
+    # Competitor→Booking linking + scrape coverage.
+    competitor_link_max_results: int = 10   # cards considered per link search
+    scrape_max_pages: int = 2               # city-search pages/date (adaptive; 1 = strict ADR-0004)
 
     def scrape_source_list(self) -> list[str]:
         """Enabled scraper names, parsed from the comma-separated env value."""

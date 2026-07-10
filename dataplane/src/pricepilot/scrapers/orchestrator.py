@@ -43,18 +43,18 @@ def competitors_by_city(
     ``property_id`` wins over ``city``; both ``None`` means every property
     (the system-wide nightly job — jobs.md: nulls mean "all").
     """
-    query = select(Competitor.id, Competitor.name, Property.city).join(
-        Property, Competitor.property_id == Property.id
-    )
+    query = select(
+        Competitor.id, Competitor.name, Competitor.source_url, Property.city
+    ).join(Property, Competitor.property_id == Property.id)
     if property_id is not None:
         query = query.where(Competitor.property_id == property_id)
     elif city is not None:
         query = query.where(func.lower(Property.city) == city.strip().lower())
 
     grouped: dict[str, list[CompetitorRef]] = {}
-    for competitor_id, name, property_city in session.execute(query):
+    for competitor_id, name, source_url, property_city in session.execute(query):
         grouped.setdefault(property_city, []).append(
-            CompetitorRef(id=competitor_id, name=name)
+            CompetitorRef(id=competitor_id, name=name, source_url=source_url)
         )
     return grouped
 
@@ -85,52 +85,87 @@ def collect_source_observations(
     competitors: Sequence[CompetitorRef],
     stay_dates: Sequence[date],
     expected_currency: str,
+    max_pages: int = 1,
 ) -> SourceOutcome:
     """Fetch/parse/match the whole window for one source. No DB access.
 
-    A block aborts the remaining dates (hammering a refusing site is both
-    impolite and useless); transient failures skip only their date. Matched
-    observations in a different currency than requested are dropped with an
-    issue note — money in the wrong currency must never reach the engine.
+    Per stay date, fetch result pages only until every in-scope competitor is
+    matched or ``max_pages`` is reached (adaptive: usually one request). A block
+    on the first page fails that date and aborts the remaining ones; a block on
+    a later page still keeps that date's already-matched observations before
+    aborting the rest. A transient failure skips only its date (page 0) or is a
+    soft per-page note (later pages). Matched observations in a different
+    currency than requested are dropped with a note.
     """
     outcome = SourceOutcome()
     matched_ever: set[Any] = set()
     currency_mismatch_dates: dict[tuple[str, str], int] = {}
 
     for index, stay_date in enumerate(stay_dates):
-        plan = scraper.plan_request(city, stay_date)
-        try:
-            html = client.get(plan.url)
-        except ScraperBlockedError as exc:
-            remaining = len(stay_dates) - index
-            outcome.blocked = True
-            outcome.dates_failed += remaining
-            outcome.issues.append(
-                f"{stay_date}: blocked ({exc}); aborted the remaining {remaining - 1} dates"
-            )
-            break
-        except ScraperFetchError as exc:
-            outcome.dates_failed += 1
-            outcome.issues.append(f"{stay_date}: {exc}")
-            continue
+        listings: list[Any] = []
+        matches: dict[Any, Any] = {}
+        fetched = False
+        block_issue: str | None = None
 
-        outcome.dates_fetched += 1
-        listings = scraper.parse_listings(html)
-        for competitor_id, listing in match_listings(listings, competitors, city).items():
-            # Name matching succeeded either way; currency decides persistence.
-            matched_ever.add(competitor_id)
-            if listing.currency != expected_currency:
-                key = (listing.name, listing.currency)
-                currency_mismatch_dates[key] = currency_mismatch_dates.get(key, 0) + 1
-                continue
-            outcome.observations.append(
-                RateObservation(
-                    competitor_id=competitor_id,
-                    stay_date=stay_date,
-                    price=listing.price,
-                    currency=listing.currency,
+        for page in range(max_pages):
+            plan = scraper.plan_request(city, stay_date, page=page)
+            try:
+                html = client.get(plan.url)
+            except ScraperBlockedError as exc:
+                remaining = len(stay_dates) - index - (1 if fetched else 0)
+                if fetched:
+                    block_issue = (
+                        f"{stay_date}: blocked ({exc}) on page {page + 1}; kept this "
+                        f"date's already-matched rates, aborted the remaining "
+                        f"{remaining} dates"
+                    )
+                else:
+                    block_issue = (
+                        f"{stay_date}: blocked ({exc}); aborted the remaining "
+                        f"{remaining - 1} dates"
+                    )
+                break
+            except ScraperFetchError as exc:
+                if page == 0:
+                    outcome.dates_failed += 1
+                    outcome.issues.append(f"{stay_date}: {exc}")
+                else:
+                    outcome.issues.append(f"{stay_date} page {page + 1}: {exc}")
+                break
+
+            fetched = True
+            listings.extend(scraper.parse_listings(html))
+            matches = match_listings(listings, competitors, city, identity_of=scraper.identity_of)
+            if len(matches) >= len(competitors):
+                break  # everyone found; stop paging
+
+        # A page (even a later one, cut short by a block) already succeeded for
+        # this date — process what it matched before deciding whether to abort.
+        if fetched:
+            outcome.dates_fetched += 1
+            for competitor_id, listing in matches.items():
+                matched_ever.add(competitor_id)
+                if listing.currency != expected_currency:
+                    key = (listing.name, listing.currency)
+                    currency_mismatch_dates[key] = currency_mismatch_dates.get(key, 0) + 1
+                    continue
+                outcome.observations.append(
+                    RateObservation(
+                        competitor_id=competitor_id,
+                        stay_date=stay_date,
+                        price=listing.price,
+                        currency=listing.currency,
+                    )
                 )
-            )
+
+        if block_issue is not None:
+            outcome.blocked = True
+            outcome.dates_failed += len(stay_dates) - index - (1 if fetched else 0)
+            outcome.issues.append(block_issue)
+            break
+
+        if not fetched:
+            continue
 
     # One aggregated line per offender, not one per date (90-day windows would
     # otherwise flood scrape_runs.error with near-identical lines).
@@ -158,6 +193,7 @@ def scrape_city(
     stay_dates: Sequence[date],
     sources: Sequence[str],
     currency: str,
+    max_pages: int = 1,
 ) -> dict[str, Any]:
     """Run every enabled source for one city; persist rates + run bookkeeping."""
     source_reports: dict[str, Any] = {}
@@ -185,6 +221,7 @@ def scrape_city(
             competitors=competitors,
             stay_dates=stay_dates,
             expected_currency=currency,
+            max_pages=max_pages,
         )
 
         if outcome.observations:
