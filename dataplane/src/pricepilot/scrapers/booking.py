@@ -16,13 +16,17 @@ or currency cannot be read with confidence — never guess money.
 import re
 from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urljoin, urlsplit
 
 from bs4 import BeautifulSoup
 
 from pricepilot.scrapers.base import ListingRate, PlannedRequest, SearchScraper
 
 BOOKING_SEARCH_URL = "https://www.booking.com/searchresults.html"
+BOOKING_BASE_URL = "https://www.booking.com"
+
+#: Booking paginates search results in blocks of this size (the `offset` param).
+_PAGE_SIZE = 25
 
 # \s in a str pattern matches Unicode whitespace incl. NBSP (\xa0) and
 # narrow NBSP (\u202f), which Booking uses to group digits.
@@ -33,6 +37,25 @@ _PRICE_SELECTORS = (
     '[data-testid="price-and-discounted-price"]',
     'span[data-testid="price"]',
 )
+
+
+def booking_slug(url: str | None) -> str | None:
+    """Stable Booking hotel id from a listing URL, e.g. 'ro/continental-forum-sibiu'.
+
+    Locale infixes ('.en-gb') and query strings are stripped so the same hotel
+    always yields the same key. Returns None for non-hotel or empty URLs.
+    """
+    if not url:
+        return None
+    parts = urlsplit(url).path.strip("/").split("/")
+    # Booking hotel URLs look like /hotel/<cc>/<slug>[.<locale>].html
+    if len(parts) < 3 or parts[0] != "hotel":
+        return None
+    country, filename = parts[1], parts[2]
+    slug = filename.split(".", 1)[0]
+    if not country or not slug:
+        return None
+    return f"{country}/{slug}"
 
 
 def build_search_url(city: str, stay_date: date, *, currency: str = "RON") -> str:
@@ -114,7 +137,10 @@ def parse_listings(html: str) -> list[ListingRate]:
         currency = detect_currency(price_text)
         if not name or price is None or currency is None:
             continue
-        listings.append(ListingRate(name=name, price=price, currency=currency))
+        link_el = card.select_one('a[data-testid="title-link"]')
+        href = link_el.get("href") if link_el is not None else None
+        url = urljoin(BOOKING_BASE_URL, href) if href else None
+        listings.append(ListingRate(name=name, price=price, currency=currency, url=url))
     return listings
 
 
@@ -129,3 +155,6 @@ class BookingScraper(SearchScraper):
 
     def parse_listings(self, html: str) -> list[ListingRate]:
         return parse_listings(html)
+
+    def identity_of(self, url: str | None) -> str | None:
+        return booking_slug(url)

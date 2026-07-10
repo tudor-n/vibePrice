@@ -11,6 +11,7 @@ from pricepilot.scrapers.airbnb import AirbnbScraper
 from pricepilot.scrapers.base import ListingRate
 from pricepilot.scrapers.booking import (
     BookingScraper,
+    booking_slug,
     build_search_url,
     detect_currency,
     parse_listings,
@@ -76,15 +77,36 @@ def test_parse_listings_from_search_fixture(fixtures_dir: Path) -> None:
     listings = parse_listings(html)
 
     assert listings == [
-        ListingRate(name="Ramada by Wyndham Sibiu", price=Decimal("412"), currency="RON"),
         ListingRate(
-            name="Hotel Împăratul Romanilor", price=Decimal("389"), currency="RON"
+            name="Ramada by Wyndham Sibiu",
+            price=Decimal("412"),
+            currency="RON",
+            url="https://www.booking.com/hotel/ro/ramada-sibiu.html",
         ),
-        ListingRate(name="Casa Luxemburg", price=Decimal("1234"), currency="RON"),
         ListingRate(
-            name="Pensiunea Cetate Veche", price=Decimal("435.50"), currency="RON"
+            name="Hotel Împăratul Romanilor",
+            price=Decimal("389"),
+            currency="RON",
+            url="https://www.booking.com/hotel/ro/imparatul-romanilor.en-gb.html",
         ),
-        ListingRate(name="Golden Tulip Ana Tower", price=Decimal("95"), currency="EUR"),
+        ListingRate(
+            name="Casa Luxemburg",
+            price=Decimal("1234"),
+            currency="RON",
+            url="https://www.booking.com/hotel/ro/casa-luxemburg-sibiu.html",
+        ),
+        ListingRate(
+            name="Pensiunea Cetate Veche",
+            price=Decimal("435.50"),
+            currency="RON",
+            url="https://www.booking.com/hotel/ro/pensiunea-cetate-veche.html",
+        ),
+        ListingRate(
+            name="Golden Tulip Ana Tower",
+            price=Decimal("95"),
+            currency="EUR",
+            url="https://www.booking.com/hotel/ro/golden-tulip-ana-tower-sibiu.html",
+        ),
     ]
     for listing in listings:
         assert isinstance(listing.price, Decimal)
@@ -104,6 +126,29 @@ def test_taxes_line_is_not_mistaken_for_the_price(fixtures_dir: Path) -> None:
         if listing.name == "Ramada by Wyndham Sibiu"
     )
     assert ramada.price == Decimal("412")  # not the "+RON 62 taxes" line
+
+
+def test_booking_slug_extracts_country_and_slug() -> None:
+    assert booking_slug("https://www.booking.com/hotel/ro/ramada-sibiu.html") == "ro/ramada-sibiu"
+
+
+def test_booking_slug_ignores_locale_and_query() -> None:
+    url = "https://www.booking.com/hotel/ro/imparatul-romanilor.en-gb.html?checkin=2026-07-10"
+    assert booking_slug(url) == "ro/imparatul-romanilor"
+
+
+def test_booking_slug_none_for_non_hotel_or_empty() -> None:
+    assert booking_slug("https://www.booking.com/searchresults.html") is None
+    assert booking_slug(None) is None
+    assert booking_slug("") is None
+
+
+def test_parse_listings_extracts_hotel_url(fixtures_dir: Path) -> None:
+    html = (fixtures_dir / "booking_search_sibiu.html").read_text(encoding="utf-8")
+    by_name = {listing.name: listing for listing in parse_listings(html)}
+    ramada = by_name["Ramada by Wyndham Sibiu"]
+    assert ramada.url == "https://www.booking.com/hotel/ro/ramada-sibiu.html"
+    assert booking_slug(ramada.url) == "ro/ramada-sibiu"
 
 
 def test_plan_request_builds_search_url_with_instance_currency() -> None:
