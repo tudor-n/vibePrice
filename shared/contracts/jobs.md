@@ -112,6 +112,9 @@ the dataplane writes the `"__failed__"` sentinel to `place_candidates` in that c
 {"property_id": "…|null", "linked": 9, "unlinked": 3, "blocked": false}
 ```
 
+or `{"linked": 0, "unlinked": 0, "note": "no competitors need linking"}` when no
+competitors need linking (scope resolves to nothing needing a link).
+
 Only competitors with `source_url IS NULL` and no `excluded_at` are considered;
 a Booking block sets `blocked` and stops the run. Unlinked competitors are
 retried by the next sweep.

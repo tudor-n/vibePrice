@@ -122,7 +122,7 @@ def collect_source_observations(
                 else:
                     block_issue = (
                         f"{stay_date}: blocked ({exc}); aborted the remaining "
-                        f"{remaining} dates"
+                        f"{remaining - 1} dates"
                     )
                 break
             except ScraperFetchError as exc:

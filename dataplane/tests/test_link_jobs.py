@@ -15,7 +15,7 @@ class FakeLinkSession:
     """Returns canned competitor rows for SELECTs; records UPDATEs."""
 
     def __init__(self, rows):
-        self._rows = rows  # list of (id, name, tenant_id, city)
+        self._rows = rows  # list of (id, name, city)
         self.statements = []
         self.commits = 0
 
@@ -51,7 +51,7 @@ def _competitor_updates(session):
 def test_link_sets_source_url_for_matched_competitor():
     html = (FIXTURES / "booking_link_ramada.html").read_text(encoding="utf-8")
     comp_id = uuid.uuid4()
-    session = FakeLinkSession([(comp_id, "Ramada by Wyndham Sibiu", uuid.uuid4(), "sibiu")])
+    session = FakeLinkSession([(comp_id, "Ramada by Wyndham Sibiu", "sibiu")])
     client = FakeClient(html)
 
     result = handle_link_competitor_sources(
@@ -67,7 +67,7 @@ def test_link_sets_source_url_for_matched_competitor():
 
 def test_link_leaves_unmatched_competitor_unlinked():
     html = (FIXTURES / "booking_link_ramada.html").read_text(encoding="utf-8")
-    session = FakeLinkSession([(uuid.uuid4(), "Nonexistent Guesthouse", uuid.uuid4(), "sibiu")])
+    session = FakeLinkSession([(uuid.uuid4(), "Nonexistent Guesthouse", "sibiu")])
     client = FakeClient(html)
 
     result = handle_link_competitor_sources(session, {"property_id": None}, client=client)

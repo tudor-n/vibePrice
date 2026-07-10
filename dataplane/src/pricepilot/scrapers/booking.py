@@ -124,7 +124,7 @@ def detect_currency(text: str) -> str | None:
 
 
 def parse_listings(html: str) -> list[ListingRate]:
-    """Extract (name, price, currency) from every priced property card."""
+    """Extract (name, price, currency, url) from every priced property card."""
     soup = BeautifulSoup(html, "html.parser")
     listings: list[ListingRate] = []
     for card in soup.select('[data-testid="property-card"]'):

@@ -652,9 +652,9 @@ LINK_SEARCH_LEAD_DAYS = 30
 
 
 def _competitors_needing_links(session: Session, *, property_id: UUID | None):
-    """Rows (id, name, tenant_id, city) for competitors with no link yet, honoring tombstones."""
+    """Rows (id, name, city) for competitors with no link yet, honoring tombstones."""
     query = (
-        select(Competitor.id, Competitor.name, Competitor.tenant_id, Property.city)
+        select(Competitor.id, Competitor.name, Property.city)
         .join(Property, Competitor.property_id == Property.id)
         .where(Competitor.source_url.is_(None), Competitor.excluded_at.is_(None))
     )
@@ -690,7 +690,7 @@ def handle_link_competitor_sources(
     linked = unlinked = 0
     blocked = False
     try:
-        for competitor_id, name, _tenant_id, city in rows:
+        for competitor_id, name, city in rows:
             plan = scraper.plan_request(f"{name}, {city}", link_date)
             try:
                 html = active_client.get(plan.url)
