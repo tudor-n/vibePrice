@@ -16,8 +16,9 @@ in this table too, for observability from the dashboard.
 | `ingest.events` | `{"city": "sibiu"}` | Refresh events calendar for a city |
 | `ingest.demand_signals` | `{"city": "sibiu"}` | Refresh public stats/holidays/weather signals |
 | `engine.generate_recommendations` | `{"tenant_id": "<uuid>\|null", "property_id": "<uuid>\|null", "horizon_days": 90}` | Recompute recommendations; nulls mean "all" |
-| `resolve_place` | `{"property_id": "<uuid>", "query": "<string>\|absent"}` | Resolve a property to a Google place (text search), write place_id/geo/rating + top-5 candidates, then enqueue discover_competitors. `query` overrides the default search text (property name + city) when present; enqueued by `POST /properties/{id}/resolve-place` |
+| `resolve_place` | `{"property_id": "<uuid>", "query": "<string>\|absent"}` | Resolve a property to a Google place (text search), write place_id/geo/rating + top-5 candidates, then enqueue discover_competitors — setup chain: `resolve_place → discover_competitors → link_competitor_sources`. `query` overrides the default search text (property name + city) when present; enqueued by `POST /properties/{id}/resolve-place` |
 | `discover_competitors` | `{"property_id": "<uuid>"}` | Nearby-search lodging around the resolved property; upsert competitor rows with Google data; skip the property's own place and tombstoned (excluded) rows |
+| `link_competitor_sources` | `{"property_id": "<uuid>\|null"}` | Resolve each unlinked competitor (scope: one property, or all when null) to its Booking listing and store the URL in `competitors.source_url`; enqueued after `discover_competitors` and nightly. Idempotent — only fills empty links |
 
 ## Row shape
 
@@ -101,6 +102,16 @@ the dataplane writes the `"__failed__"` sentinel to `place_candidates` in that c
 ```json
 {"property_id": "...", "discovered": 4, "skipped_excluded": 1, "capped": 0}
 ```
+
+`link_competitor_sources`:
+
+```json
+{"property_id": "…|null", "linked": 9, "unlinked": 3, "blocked": false}
+```
+
+Only competitors with `source_url IS NULL` and no `excluded_at` are considered;
+a Booking block sets `blocked` and stops the run. Unlinked competitors are
+retried by the next sweep.
 
 ## Dashboard "Check for new prices"
 
