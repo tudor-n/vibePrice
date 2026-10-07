@@ -1,4 +1,4 @@
-# PricePilot
+# vibePrice
 
 Dynamic pricing recommendations for hotels, guesthouses, and short-term rentals.
 Scrapes competitor rates, ingests public demand signals (events, tourism statistics,
